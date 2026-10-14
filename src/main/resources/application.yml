@@ -1,0 +1,17 @@
+spring:
+  application:
+    name: incident-copilot
+  datasource:
+    # Локальные значения по умолчанию; в других средах задаются переменными окружения
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/copilot}
+    username: ${DB_USER:copilot}
+    password: ${DB_PASSWORD:copilot}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-components: always
