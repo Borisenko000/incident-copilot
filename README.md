@@ -2,45 +2,16 @@
 
 > **Статус:** Architecture & Product Specification v1.0 · **Дата:** 13.10.2026 · **Язык документации:** русский  
 > **Назначение документа:** единый исходный документ для SDD (Spec-Driven Development) с Claude Code.  
-> **Состояние реализации:** архитектура и требования **спроектированы**, продукт ещё **не реализован и не протестирован**. Примеры API и UI ниже — **контракты будущей системы**, не заявления о готовых функциях.
+> **Состояние реализации:** архитектура и требования **спроектированы**, продукт ещё **не реализован и не протестирован**. Примеры API и UI ниже — **контракты будущей системы**, не заявления о готовых функциях.  
+> **Объём текущей итерации (учебная неделя):** см. [`specs/roadmap.md`](specs/roadmap.md). В документе части помечены **P0** (входит в неделю) и **P1** (следующие итерации).
 
 ---
 
 ## 0. Кратко о продукте
 
-**Incident Copilot** — подключаемая платформа интеллектуального расследования технических инцидентов. Она автоматически или по запросу инженера принимает событие, собирает диагностические факты, сопоставляет их с релевантной документацией и подтверждённым опытом, проверяет гипотезы при помощи инструментов и возвращает **один наиболее обоснованный вердикт с рекомендациями по исправлению**. Результат поступает инженеру в веб-интерфейс и, при настроенном канале, в Telegram.
+**Incident Copilot** — платформа расследования технических инцидентов: принимает событие, собирает факты инструментами, сопоставляет их с документацией нужной версии (RAG) и возвращает **один обоснованный вердикт с рекомендациями** либо честный `INCONCLUSIVE`.
 
-**Основная ценность:** сократить ручное переключение между логами, метриками, документацией и историей аварий. Пользователь получает не пересказ stack trace, а проверяемую причинную гипотезу, последствия и конкретный план действий.
-
-**Основные свойства:**
-
-- **Универсальность:** общий контракт события для HTTP 500, исключений Java, PostgreSQL, JVM, внешних API, Kafka DLT, мониторинговых алертов; Kafka не является обязательной частью системы.
-- **Встраиваемость:** лёгкий Spring Boot Starter для Java/Spring; REST/Webhook для любых других технологий. AI-движок **не встраивается** в рабочее приложение.
-- **Автоматизм:** в штатном режиме расследование стартует после поступления события **асинхронно**; ручной запуск доступен через API/UI.
-- **Evidence-driven:** реальные сведения от инструментов важнее «знаний» языковой модели; документы подтверждают технический механизм, а не то, что именно он произошёл.
-- **Human-in-the-loop:** инженер может подтвердить/отклонить гипотезу, запросить следующую, добавить факты, указать фактическую причину и закрыть инцидент.
-- **Контролируемая память:** ответы LLM **не добавляются автоматически** в доверенную базу знаний. Исторический кейс допускается в поиск только после независимой проверки и одобрения.
-- **Отказоустойчивость:** отсутствие GigaChat не нарушает работу подключённого приложения и не уничтожает принятое событие.
-
-### 0.1. Целевая аудитория и сценарии
-
-| Пользователь | Боль | Что получает |
-|---|---|---|
-| Backend-разработчик | Ошибка незнакомого сервиса, непонятный stack trace | Контекстную диагностику, вероятную причину и следующие проверки |
-| On-call / SRE / служба поддержки | Много разрозненных алертов и систем | Единый инцидент, уведомление, результат AI-расследования |
-| Команда сопровождения | Утрата знаний после решения аварий | Проверенные runbooks и повторно используемый опыт |
-| Автор небольшого Spring Boot-сервиса | Нет полноценного мониторингового стека | Возможность отправить ошибку в API и получить разбор |
-
-**Продуктовая гипотеза, которую нужно проверить:** система сокращает ручные шаги первичной диагностики и повышает долю полезных первых рекомендаций. Это не подтверждённый рыночный результат; измеряем на симуляторе и позднее — на реальных сценариях.
-
-### 0.2. Важные границы
-
-- Copilot **не гарантирует** выявление первопричины любого инцидента: иногда телеметрия объективно отсутствует.
-- Успешный отчёт `DIAGNOSED` не содержит раздел «чего не хватает»; если обоснованный вывод невозможен — `INCONCLUSIVE` и отдельное краткое служебное уведомление без выдуманного диагноза.
-- Пользователю показывается **одна основная гипотеза**. Внутренние альтернативы сохраняются для процесса и не выводятся в основном отчёте.
-- В пользовательском отчёте **нет ссылок на документацию и на сырые доказательства**. Внутри системы сохраняются `evidenceId`, `sourceId`, версии и результаты проверок для аудита и тестов.
-- Автоматические действия в production, произвольные SQL/shell-команды и изменения инфраструктуры **не входят в MVP**.
-- Учебный MVP работает на **симулированных** фактах; не должен создавать видимость анализа настоящего производства.
+Описание продукта, целевая аудитория, границы и продуктовая формула — в [`specs/mission.md`](specs/mission.md) (единственный источник, здесь не дублируется).
 
 ---
 
@@ -49,6 +20,7 @@
 | Решение | Выбор | Почему |
 |---|---|---|
 | Архитектура | **Модульный монолит + ports/adapters (Clean/Hexagonal)** | Изолировать ответственность без набора микросервисов |
+| Сборка | **Один Maven-модуль**, слои — пакеты `domain`, `application`, `port`, `adapter.in`, `adapter.out`, `simulator` | Учебный объём; мультимодульная сборка добавляет сложность без пользы для логики. Разделение — P1 при необходимости |
 | Java | **Java 21**, Spring Boot 3.5.x | Практический Java/Spring-стек; точные версии закрепить после smoke-теста |
 | AI-фреймворк | **Spring AI 1.1.x совместимой стабильной версии** | Управление AI-клиентом, RAG и tools; не смешивать примеры от Spring AI 2.x / Boot 4 |
 | Модель | **GigaChat** | Практика API без обязательного зарубежного VPN; доступность и ограничения проверить на аккаунте |
@@ -57,9 +29,9 @@
 | Логическое разделение | Схемы **`ops`** и **`knowledge`** | **Не две базы данных**, а две области ответственности |
 | Очередь | `ops.work_items`, `FOR UPDATE SKIP LOCKED`, lease/retry | Сохранность задания после коммита без Kafka/RabbitMQ в MVP |
 | Поиск | Сначала exact/FTS, затем vector search, фильтрация по версии | Точные коды и имена исключений нельзя терять при семантическом поиске |
-| MCP | Тот же `DiagnosticToolPort`, MCP adapter для выбранных read-only tools | Никакой параллельной реализации бизнес-логики tools |
-| Вывод | **Spring MVC + Thymeleaf** (MVP UI), REST + NotificationPort (Telegram, webhook) | Веб-панель в том же сервере без отдельного frontend-сервиса |
-| Встраивание | Starter только для **сбора и доставки событий** | При ошибке Copilot бизнес-приложение продолжает работу |
+| MCP (P1) | Тот же `DiagnosticToolPort`, MCP adapter для выбранных read-only tools | Никакой параллельной реализации бизнес-логики tools |
+| Вывод | **P0:** только REST. **P1:** Spring MVC + Thymeleaf, NotificationPort (Telegram, webhook) | Веб-панель в том же сервере без отдельного frontend-сервиса |
+| Встраивание (P1) | Starter только для **сбора и доставки событий** | При ошибке Copilot бизнес-приложение продолжает работу |
 | Данные симулятора | Fixtures + отдельные эталонные ответы вне контекста агента | Честные AI-evaluations, отсутствие утечки ground truth |
 
 **Важное технологическое условие:** конкретная версия/тариф GigaChat может не поддерживать все функции одинаково. `tool calling`, embeddings, строгий structured output и TLS проверяются отдельными spike-тестами. Если `response_format=json_schema` недоступен, использовать JSON-подобный вывод + Jackson/JSON Schema validation + ограниченный retry. Запрещено обходить TLS-проверку через `verify_ssl=false` в production-конфигурации.
@@ -136,6 +108,8 @@ flowchart TB
 
 **Правило схемы:** прямой доступ к таблицам и клиентам внешних систем имеют инфраструктурные адаптеры/репозитории, а не Domain. Стрелки на логической схеме показывают зависимости и поток данных, не означают, что `Domain` вызывает SQL сам.
 
+**Схемы §2 показывают целевую систему целиком.** В MVP-неделю из них нет: Starter, DLT Adapter, NotificationPort/Telegram, загрузки документации с сайтов (вместо неё — локальные файлы). Точный объём — в [`specs/roadmap.md`](specs/roadmap.md).
+
 ### 2.2. Последовательность одного автоматического расследования
 
 ```mermaid
@@ -185,7 +159,7 @@ sequenceDiagram
     end
     W->>N: отправить уведомление
     N-->>E: Telegram/webhook со ссылкой на отчёт
-    E->>A: feedback CONFIRM / REJECT / ALTERNATIVE
+    E->>A: feedback CONFIRM / REJECT / COMMENT или новое расследование ALTERNATIVE (P1)
     A->>P: сохранить feedback, при необходимости новый investigation job
 ```
 
@@ -201,9 +175,9 @@ sequenceDiagram
 | **Ports** | `IncidentRepository`, `WorkQueuePort`, `EvidenceSourcePort`, `LlmGateway`, `KnowledgeRetrieverPort`, `NotificationPort`, `DiagnosticToolPort` | Независимые контракты внешнего мира | Domain |
 | **Inbound adapters** | REST Controllers, Webhook adapter, Simulator, будущий MCP facade | Преобразуют вход в use cases | Application |
 | **Outbound adapters** | PostgreSQL repositories, GigaChat adapter, pgvector, simulated tools, Telegram, documentation fetcher | Реализуют порты, HTTP/SQL/SDK | Ports / инфраструктура |
-| **Delivery libraries** | `copilot-spring-boot-starter` | Локальный захват событий и доставка в сервер | Spring / HTTP, но **не** на `copilot-server` |
+| **Delivery libraries (P1)** | `copilot-spring-boot-starter` | Локальный захват событий и доставка в сервер | Spring / HTTP, но **не** на сервер Copilot |
 
-Инъекции зависимостей настраиваются в composition root Spring. **Запрещено:** `Domain -> Spring AI`, `Domain -> JPA`, `Application -> конкретный GigaChat SDK`, `Starter -> backend database`, `LLM -> произвольный SQL/shell`.
+В MVP слои — это **пакеты одного Maven-модуля**, а не отдельные модули; границы соблюдаются правилами импортов (при желании — ArchUnit-тест, P1). Инъекции зависимостей настраиваются в composition root Spring. **Запрещено:** `Domain -> Spring AI`, `Domain -> JPA`, `Application -> конкретный GigaChat SDK`, `Starter -> backend database`, `LLM -> произвольный SQL/shell`.
 
 ### 2.4. Функции и связи компонентов
 
@@ -222,9 +196,9 @@ sequenceDiagram
 | `InvestigationOrchestrator` | investigation job | обновлённый state, verdict или failure | Не обращается напрямую к JPA/GigaChat SDK |
 | `VerdictValidator` | candidate + evidence + docs | `PASS / REJECT(reason)` | Не доказывает причинность математически |
 | `ReportService` | принятый verdict | неизменяемая версия отчёта | Не отправляет Telegram сам |
-| `FeedbackService` | инженерное решение | feedback + optional next job | Не превращает комментарий в доверенный RAG автоматически |
-| `KnowledgeSync` | allowlisted source config | новые/обновлённые chunks | Не переписывает знания по ответу LLM |
-| `NotificationAdapter` | job + адресат | delivery result | Не формирует диагноз |
+| `FeedbackService` (P1) | инженерное решение | feedback + optional next job | Не превращает комментарий в доверенный RAG автоматически |
+| `KnowledgeSync` | P0: локальные файлы `src/main/resources/knowledge/*.md`; P1: allowlisted URL | новые/обновлённые chunks | Не переписывает знания по ответу LLM |
+| `NotificationAdapter` (P1) | job + адресат | delivery result | Не формирует диагноз |
 
 ---
 
@@ -295,14 +269,16 @@ ACCEPT EVENT (transaction: event + incident + durable work_item)
 
 ### 3.5. Критерии проверки кандидата (gates)
 
-| Gate | Что проверяем | Автоматизация |
-|---|---|---|
-| `SCHEMA` | Корректный JSON/DTO, обязательные поля | детерминированно |
-| `EVIDENCE` | Утверждения о фактах связаны с реально полученными `evidenceId` | детерминированно + семантическая оценка |
-| `MECHANISM` | Механизм технически возможен для указанной версии и не противоречит найденным документам | version filters + документация + LLM-оценка, не абсолютная гарантия |
-| `CAUSALITY` | Объяснение связывает причину и симптомы, различает следствие и источник | эвристики + LLM-оценка; иногда только эксперт/эксперимент подтвердит |
-| `RESOLUTION` | Советы применимы, безопасны и не требуют недопустимых действий | policy checks + экспертные шаблоны |
-| `COMPLETENESS` | Для успешного ответа достаточно фактов, а не просто правдоподобной догадки | правила и настраиваемые пороги; возможность `INCONCLUSIVE` |
+| Gate | Приоритет | Что проверяем | Автоматизация |
+|---|---|---|---|
+| `SCHEMA` | P0 | Корректный JSON/DTO, обязательные поля | детерминированно |
+| `EVIDENCE` | P0 | Все `supportingEvidenceIds` реально существуют в этом расследовании | детерминированно (семантическая оценка — P1) |
+| `MECHANISM` | P1 | Механизм технически возможен для указанной версии и не противоречит найденным документам | version filters + документация + LLM-оценка, не абсолютная гарантия |
+| `CAUSALITY` | P1 | Объяснение связывает причину и симптомы, различает следствие и источник | эвристики + LLM-оценка; иногда только эксперт/эксперимент подтвердит |
+| `RESOLUTION` | P1 | Советы применимы, безопасны и не требуют недопустимых действий | policy checks + экспертные шаблоны |
+| `COMPLETENESS` | P1 | Для успешного ответа достаточно фактов, а не просто правдоподобной догадки | правила и настраиваемые пороги; возможность `INCONCLUSIVE` |
+
+В MVP-неделю работают только детерминированные gates `SCHEMA` и `EVIDENCE`: проверки «LLM оценивает LLM» дорогие и ненадёжные, их добавляем после появления eval-набора.
 
 Нельзя считать, что все gates дают математическое доказательство. Даже `DIAGNOSED` содержит **«основную гипотезу»**, а не автоматически подтверждённую root cause. Флаг `engineerConfirmed` / `resolutionVerified` отдельный.
 
@@ -367,13 +343,15 @@ ACCEPT EVENT (transaction: event + incident + durable work_item)
 
 ## 4. Интеграция и встраиваемый Spring Boot Starter
 
-### 4.0. UI и уведомления без нового микросервиса
+### 4.0. UI и уведомления без нового микросервиса (P1)
 
-**Веб-панель** входит в `copilot-server`: Spring MVC + Thymeleaf, адаптивный минималистичный UI без отдельного frontend-приложения. Экран списка инцидентов отображает service/severity/status/время, карточка — последний успешный отчёт, текущий статус расследования и действия `CONFIRM`, `REJECT`, `ALTERNATIVE`, `ADD_EVIDENCE`, `RESOLVE`. Переходы между состояниями выполняются через те же application use cases, что и REST; шаблоны не содержат бизнес-логики. В MVP допустим периодический polling `GET /incidents/{id}`; SSE и WebSocket не обязательны.
+В MVP-неделю результат доступен **только через REST** (`GET /api/v1/incidents/{id}/report`).
 
-**Telegram** — только исходящие уведомления (короткий текст и ссылка на защищённый UI). Никакие пароли, токены, трассировки и сырые логи в Telegram не отправлять. **Встроенной системы пользователей/команд в MVP нет**: пользователи входят через Spring Security с внешне настраиваемой аутентификацией, а соответствие `service → notification channel` берётся из конфигурации. Для локальной демонстрации допускаются test credentials под отдельным `dev` profile; в production доступ должен быть защищён полноценной аутентификацией (например, OIDC/JWT) и ролями.
+**Веб-панель (P1)** входит в сервер Copilot: Spring MVC + Thymeleaf, адаптивный минималистичный UI без отдельного frontend-приложения. Экран списка инцидентов отображает service/severity/status/время, карточка — последний успешный отчёт, текущий статус расследования и действия: feedback `CONFIRM` / `REJECT` / `COMMENT`, новое расследование `ALTERNATIVE`, добавить данные (`POST /evidence`), зафиксировать исправление (`POST /resolve`). Переходы между состояниями выполняются через те же application use cases, что и REST; шаблоны не содержат бизнес-логики. В MVP допустим периодический polling `GET /incidents/{id}`; SSE и WebSocket не обязательны.
 
-### 4.1. Принцип подключения
+**Telegram (P1)** — только исходящие уведомления (короткий текст и ссылка на UI). Никакие пароли, токены, трассировки и сырые логи в Telegram не отправлять. Системы пользователей и команд нет; соответствие `service → notification channel` берётся из конфигурации.
+
+### 4.1. Принцип подключения (Starter — P1)
 
 ```mermaid
 flowchart LR
@@ -396,7 +374,6 @@ incident-copilot:
   endpoint: https://incident.example.internal
   service-name: order-service
   environment: staging
-  api-key: ${INCIDENT_COPILOT_API_KEY}
   capture:
     unhandled-exceptions: true
     http-5xx: true
@@ -410,7 +387,7 @@ incident-copilot:
     max-retries: 3
 ```
 
-`api-key` хранится в секретах окружения, не коммитится. Данные запросов/ответов и Authorization headers не собираются по умолчанию. При переполнении очереди — настройка `DROP_WITH_METRIC`/тестируемая альтернатива, но **не** блокировать request thread по умолчанию.
+Данные запросов/ответов и Authorization headers не собираются по умолчанию. При переполнении очереди — настройка `DROP_WITH_METRIC`/тестируемая альтернатива, но **не** блокировать request thread по умолчанию.
 
 ### 4.3. REST/Webhook — альтернатива starter
 
@@ -424,30 +401,32 @@ incident-copilot:
 
 ## 5. Полный REST API v1 (контракты)
 
-Общий префикс `/api/v1`. Все методы требуют соответствующей аутентификации и авторизации. `GET` только читает. Изменения проходят валидируемые application use cases; `Idempotency-Key` поддерживается для ручных команд с повторным выполнением.
+Общий префикс `/api/v1`. `GET` только читает. Изменения проходят валидируемые application use cases; `Idempotency-Key` поддерживается для ручных команд с повторным выполнением (P1).
 
-| Метод | URI | Действие | Доступ | Ответ |
+**Аутентификации нет:** проект учебный и запускается только локально; защита API вне объёма проекта.
+
+| Приоритет | Метод | URI | Действие | Ответ |
 |---|---|---|---|---|
-| `POST` | `/events` | Приём автоматического event/webhook/DLT payload после нормализации | `event:write` | `202` + IDs |
-| `POST` | `/incidents` | Создать инцидент вручную по тексту/stack trace | `incident:write` | `202` |
-| `GET` | `/incidents` | Список/фильтр/пагинация по service/severity/status | `incident:read` | `200` |
-| `GET` | `/incidents/{id}` | Карточка инцидента, текущая версия и статус | `incident:read` | `200` |
-| `GET` | `/incidents/{id}/investigations` | История версий расследования | `incident:read` | `200` |
-| `GET` | `/incidents/{id}/investigations/{invId}` | Статус/итог отдельного расследования | `incident:read` | `200` |
-| `GET` | `/incidents/{id}/report` | Последний успешный отчёт либо статус недоступности | `incident:read` | `200`/`404`/`409` |
-| `POST` | `/incidents/{id}/evidence` | Добавить собственные диагностические данные | `incident:write` | `201` |
-| `POST` | `/incidents/{id}/feedback` | Подтвердить / отклонить / предоставить разбор | `incident:feedback` | `201` |
-| `POST` | `/incidents/{id}/investigations` | Новое/дополнительное расследование, включая запрос другой гипотезы | `incident:write` | `202` |
-| `POST` | `/incidents/{id}/resolve` | Зафиксировать устранение и фактическое исправление | `incident:resolve` | `200` |
-| `GET` | `/actuator/health` | Технический health endpoint | deployment policy | `200`/`503` |
-| `GET` | `/actuator/prometheus` | Метрики самого Copilot, при разрешении | internal-only | `200` |
+| P0 | `POST` | `/events` | Приём автоматического event/webhook/DLT payload после нормализации | `202` + IDs |
+| P0 | `POST` | `/incidents` | Создать инцидент вручную по тексту/stack trace | `202` |
+| P1 | `GET` | `/incidents` | Список/фильтр/пагинация по service/severity/status | `200` |
+| P0 | `GET` | `/incidents/{id}` | Карточка инцидента, текущая версия и статус | `200` |
+| P1 | `GET` | `/incidents/{id}/investigations` | История версий расследования | `200` |
+| P1 | `GET` | `/incidents/{id}/investigations/{invId}` | Статус/итог отдельного расследования | `200` |
+| P0 | `GET` | `/incidents/{id}/report` | Последний успешный отчёт либо статус недоступности | `200`/`404`/`409` |
+| P1 | `POST` | `/incidents/{id}/evidence` | Добавить собственные диагностические данные | `201` |
+| P1 | `POST` | `/incidents/{id}/feedback` | `CONFIRM` / `REJECT` / `COMMENT` | `201` |
+| P1 | `POST` | `/incidents/{id}/investigations` | Новое расследование: `ADDITIONAL` / `ALTERNATIVE` | `202` |
+| P1 | `POST` | `/incidents/{id}/resolve` | Зафиксировать устранение и фактическое исправление | `200` |
+| P0 | `GET` | `/actuator/health` | Технический health endpoint | `200`/`503` |
+| P1 | `GET` | `/actuator/prometheus` | Метрики самого Copilot | `200` |
 
 **Только `dev`/`test` profile**, недоступны в production:
 
-| Метод | URI | Назначение |
-|---|---|---|
-| `GET` | `/api/v1/simulator/scenarios` | Список синтетических сценариев без эталонных ответов |
-| `POST` | `/api/v1/simulator/scenarios/{scenarioId}/run` | Запустить сценарий через реальный pipeline |
+| Приоритет | Метод | URI | Назначение |
+|---|---|---|---|
+| P1 | `GET` | `/api/v1/simulator/scenarios` | Список синтетических сценариев без эталонных ответов |
+| P0 | `POST` | `/api/v1/simulator/scenarios/{scenarioId}/run` | Запустить сценарий через реальный pipeline |
 
 **P1 (не часть обязательного базового REST):** `POST /api/v1/admin/knowledge/sync` для ручного пересканирования allowlist-документов; отдельный read-only MCP endpoint с собственной схемой защиты. Уведомления отправляются через `NotificationPort`, для них **не нужен** отдельный пользовательский `/notify` API.
 
@@ -456,7 +435,6 @@ incident-copilot:
 ```http
 POST /api/v1/events HTTP/1.1
 Host: localhost:8081
-Authorization: Bearer <client-token>
 Content-Type: application/json
 
 {
@@ -516,7 +494,7 @@ HTTP 202 означает **принято для обработки**, не «L
 
 Создаёт самостоятельный инцидент и фоновое расследование даже при отсутствии мониторинговых интеграций. **Не придумывать** метрики в этом режиме.
 
-### 5.3. Работа инженера с гипотезой
+### 5.3. Работа инженера с гипотезой (P1)
 
 `POST /api/v1/incidents/{id}/feedback`
 
@@ -528,7 +506,7 @@ HTTP 202 означает **принято для обработки**, не «L
 }
 ```
 
-`decision` = `CONFIRM`, `REJECT`, `COMMENT`. Комментарий используется как **новый источник сведений с типом HUMAN_INPUT**, но сам по себе не считается проверенным фактом. `REJECT` фиксируется и автоматически создаёт новый investigation job с отрицательной обратной связью. Для `CONFIRM` записывается подтверждение гипотезы, **но не факт исправления**.
+`decision` = `CONFIRM`, `REJECT`, `COMMENT` (единственный допустимый набор; запрос другой гипотезы — это не `decision`, а новое расследование с `mode=ALTERNATIVE`, см. ниже). Комментарий используется как **новый источник сведений с типом HUMAN_INPUT**, но сам по себе не считается проверенным фактом. `REJECT` фиксируется и автоматически создаёт новый investigation job с отрицательной обратной связью. Для `CONFIRM` записывается подтверждение гипотезы, **но не факт исправления**.
 
 `POST /api/v1/incidents/{id}/investigations`
 
@@ -553,11 +531,11 @@ HTTP 202 означает **принято для обработки**, не «L
 }
 ```
 
-`resolve` не делает автоматическую публикацию кейса в RAG. Он становится **кандидатом на подтверждённое знание** после независимой проверки `KnowledgePromotionPolicy` (см. раздел 9).
+`resolve` не делает автоматическую публикацию кейса в RAG. Он становится **кандидатом на подтверждённое знание** после независимой проверки `KnowledgePromotionPolicy` (см. раздел 8.4).
 
 ### 5.4. Типовые HTTP ошибки API
 
-`400` — синтаксис/невалидный JSON; `401` — нет аутентификации; `403` — нет разрешения; `404` — нет доступного ресурса; `409` — конфликт состояния (например, повторное открытие завершённого расследования); `413` — превышен размер логов; `422` — семантически недопустимые параметры; `429` — лимит запросов; `5xx` — внутренняя ошибка без раскрытия чувствительных данных. Единый `ProblemDetail` формат: `type, title, status, detail, correlationId`.
+`400` — синтаксис/невалидный JSON; `404` — нет такого ресурса; `409` — конфликт состояния (например, повторное открытие завершённого расследования); `413` — превышен размер логов; `422` — семантически недопустимые параметры; `429` — лимит запросов; `5xx` — внутренняя ошибка без раскрытия чувствительных данных. Единый `ProblemDetail` формат: `type, title, status, detail, correlationId`.
 
 ---
 
@@ -583,7 +561,9 @@ stateDiagram-v2
 
 `INCONCLUSIVE` — обоснованного вывода нет при исчерпании доступных данных/бюджета. `FAILED` — техническая ошибка исполнения (например, недоступность AI API). Для обычного просмотра показываем **последнюю успешную** версию отчёта вместе с явным статусом самого последнего расследования, чтобы не принять устаревший результат за новый.
 
-### 6.2. Уведомления
+### 6.2. Уведомления (P1)
+
+В MVP-неделю уведомлений нет: результат читается через `GET /incidents/{id}/report`.
 
 - На `HIGH/CRITICAL` допускается **раннее короткое** уведомление о регистрации; оно не выдаёт вердикт.
 - По `DIAGNOSED` отправляем **одно итоговое** уведомление ответственному с названием, основной гипотезой, краткой рекомендацией и ссылкой **на страницу Copilot**, а не на внешнюю документацию.
@@ -595,6 +575,8 @@ stateDiagram-v2
 ---
 
 ## 7. PostgreSQL: одна БД, восемь таблиц и точные границы
+
+**MVP-неделя — 7 таблиц:** все, кроме `ops.feedback` (P1). Миграции — Flyway; образ БД — `pgvector/pgvector:pg16`.
 
 **Не две БД.** Используем одну транзакционную PostgreSQL, внутри которой логические схемы `ops` (жизненный цикл и временные доказательства) и `knowledge` (проверенная документация). `pgvector` — расширение PostgreSQL, не отдельная vector DB. Способность анализировать ошибки **не возникает** из PostgreSQL автоматически; БД только сохраняет и предоставляет сведения агенту.
 
@@ -629,7 +611,7 @@ erDiagram
 | `ops.incident_events` | `id UUID`, `incident_id FK`, `source`, `event_id`, `occurred_at`, `payload JSONB`, `received_at` | **UNIQUE(source,event_id)** в рамках одной установки; лимит JSON/PII sanitation |
 | `ops.investigations` | `id UUID`, `incident_id FK`, `version`, `status`, `report JSONB`, `state JSONB`, `model_name`, `prompt_version`, `started_at`, `completed_at` | UNIQUE `(incident_id,version)`, enum statuses, версии immutable после завершения |
 | `ops.evidence` | `id UUID`, `incident_id FK`, `investigation_id FK nullable`, `kind`, `origin`, `observed_at`, `content JSONB`, `digest`, `created_at` | безопасная длина, ссылки на исходный сбор, индекс по incident/time |
-| `ops.feedback` | `id UUID`, `investigation_id FK`, `actor`, `decision`, `comment`, `created_at` | авторизованный actor, audit, необязательная ссылка на приложенные evidence |
+| `ops.feedback` (P1) | `id UUID`, `investigation_id FK`, `actor`, `decision`, `comment`, `created_at` | actor (имя из запроса), audit, необязательная ссылка на приложенные evidence |
 | `ops.work_items` | `id UUID`, `kind`, `status`, `incident_id/investigation_id nullable`, `payload`, `attempts`, `available_at`, `leased_until`, `lease_owner`, `dedupe_key`, `last_error` | ограниченные retries, lease/recovery, UNIQUE dedupe_key при наличии |
 | `knowledge.sources` | `id UUID`, `kind`, `origin_uri`, `product`, `product_version`, `status`, `trust_level`, `content_hash`, `etag`, `last_modified`, `checked_at`, `metadata JSONB` | allowlist, source provenance, version, unique canonical identity |
 | `knowledge.chunks` | `id UUID`, `source_id FK`, `chunk_no`, `content`, `embedding vector(D)`, `embedding_model`, `content_hash` | UNIQUE `(source_id,chunk_no)`, поиск только по APPROVED источникам |
@@ -647,9 +629,10 @@ erDiagram
 
 В одной транзакции: `INSERT event`, `INSERT/UPDATE incident`, `INSERT investigation(status=QUEUED)`, `INSERT work_item(kind=INVESTIGATE, status=READY)` → **COMMIT** → `202`. На повторное событие по `(source,eventId)` никаких новых investigation/job не создаётся.
 
-Worker периодически выбирает задания по индексу `status, available_at` через `FOR UPDATE SKIP LOCKED`, атомарно ставит lease, **завершает транзакцию перед сетевыми LLM-вызовами**, затем работает вне DB-транзакции. По результату в новой транзакции записывает версию расследования и `NOTIFY` work item. При падении worker задание возвращается после истечения lease (возможны повторы, обработчики идемпотентны); heartbeat/lease-extension для долгих расследований. Не держать блокировку строки БД на всё время работы GigaChat.
+Worker периодически выбирает задания по индексу `status, available_at` через `FOR UPDATE SKIP LOCKED`, атомарно ставит lease, **завершает транзакцию перед сетевыми LLM-вызовами**, затем работает вне DB-транзакции. По результату в новой транзакции записывает версию расследования (и, в P1, work item типа `NOTIFICATION`). При падении worker задание возвращается после истечения lease (возможны повторы, обработчики идемпотентны). Не держать блокировку строки БД на всё время работы GigaChat.
 
-P0: один или несколько workers, bounded concurrency, retries + exponential backoff, dead status после исчерпания, восстановление просроченных leases. `NOTIFICATION` и `KNOWLEDGE_SYNC` используют тот же generic механический worker, но разные handlers. Это **один модуль с несколькими типами задач**, не дополнительные микросервисы.
+**P0 (неделя):** один worker на `@Scheduled`, `FOR UPDATE SKIP LOCKED`, lease через `leased_until`/`lease_owner`, счётчик `attempts` (не более 3), восстановление просроченных leases.  
+**P1:** несколько workers с bounded concurrency, exponential backoff с jitter, dead-статус после исчерпания, heartbeat/lease-extension, типы задач `NOTIFICATION` и `KNOWLEDGE_SYNC`. Они используют тот же generic механический worker, но разные handlers. Это **один модуль с несколькими типами задач**, не дополнительные микросервисы.
 
 ### 7.5. Что хранить в `JSONB`, а что выделять отдельно
 
@@ -668,9 +651,13 @@ P0: один или несколько workers, bounded concurrency, retries + e
 2. **RUNBOOK:** инструкция команды, проверенная ответственным человеком.
 3. **VERIFIED_CASE:** исторический инцидент с подтверждённой причиной и результатом исправления.
 
-**Не хранить популярные инциденты как заранее «истинные» причины.** Для MVP достаточно небольших релевантных официальных документов и 2–3 отрецензированных runbook. Проверенные реальные случаи будут появляться постепенно. Симулятор имеет **отдельный закрытый `ground_truth`**, недоступный инструментам агента/RAG.
+**Не хранить популярные инциденты как заранее «истинные» причины.** Для MVP-недели достаточно 5–10 небольших документов в `src/main/resources/knowledge/` под сценарий `DB_POOL_EXHAUSTED`: выдержки из официальной документации HikariCP, Spring Transactions, PostgreSQL (с указанием источника и версии) и 2–3 отрецензированных runbook. Документы другой версии добавляются намеренно — для проверки фильтра по версии. Проверенные реальные случаи будут появляться постепенно. Симулятор имеет **отдельный закрытый `ground_truth`**, недоступный инструментам агента/RAG.
 
 ### 8.2. ETL и актуальность
+
+**P0 (неделя):** RAG входит в объём недели, но источник — **локальные файлы** `src/main/resources/knowledge/*.md` с front-matter (`product`, `version`, `kind`, `status`, `origin`). `KnowledgeLoader` при старте или по команде: парсит файл → chunker по заголовкам → embeddings GigaChat → `knowledge.sources` + `knowledge.chunks`; неизменённые файлы (по `content_hash`) не переиндексируются. Если embeddings недоступны — поиск работает только по FTS, а vector-часть включается после спайка.
+
+**P1:** загрузка с официальных сайтов по схеме ниже (allowlist, ETag/Last-Modified, регулярный sync).
 
 ```mermaid
 flowchart LR
@@ -698,11 +685,13 @@ flowchart LR
 
 Если релевантных документов нет, не подставлять документы неподходящей версии, а анализировать доступную телеметрию; когда объяснение механизма невозможно верифицировать, уровень уверенности снижается или `INCONCLUSIVE`.
 
-### 8.4. Политика Knowledge Promotion (строго)
+### 8.4. Политика Knowledge Promotion (строго; workflow — P1)
+
+В MVP-неделю `status=APPROVED` для файлов `src/main/resources/knowledge/` выставляет автор вручную в front-matter; выводы LLM в базу знаний не попадают никак.
 
 ```text
 Новый официальный документ / внутренний runbook / решённый инцидент
- -> provenance и авторизация / allowlist
+ -> provenance / allowlist
  -> проверка версии, содержимого и digest
  -> (для человеческого кейса) независимая проверка фактов и результата исправления
  -> APPROVED
@@ -722,22 +711,22 @@ flowchart LR
 
 ### 9.1. Канонические read-only tools
 
-| Tool | Параметры | Ответ | Откуда данные MVP |
-|---|---|---|---|
-| `get_logs` | `incidentId`, `traceId?`, `window` | записи логов + source/time IDs | Fixtures/evidence repository |
-| `get_metrics` | `incidentId`, `service`, `metricNames`, `window` | временные ряды/агрегаты | Fixtures/evidence repository |
-| `get_trace` | `incidentId`, `traceId` | spans, durations, error markers | Fixtures |
-| `get_recent_changes` | `incidentId`, `service`, `window` | deploy/config changes | Fixtures |
-| `get_database_activity` | `incidentId`, `service` | безопасный summary PostgreSQL/Hikari | Fixtures; read-only adapter P1 |
-| `search_knowledge` | `query`, `product`, `version` | trusted snippets + source IDs | knowledge tables |
+| Приоритет | Tool | Параметры | Ответ | Откуда данные MVP |
+|---|---|---|---|---|
+| P0 | `get_logs` | `incidentId`, `traceId?`, `window` | записи логов + source/time IDs | Fixtures/evidence repository |
+| P0 | `get_metrics` | `incidentId`, `service`, `metricNames`, `window` | временные ряды/агрегаты | Fixtures/evidence repository |
+| P0 | `get_trace` | `incidentId`, `traceId` | spans, durations, error markers | Fixtures |
+| P1 | `get_recent_changes` | `incidentId`, `service`, `window` | deploy/config changes | Fixtures |
+| P0 | `get_database_activity` | `incidentId`, `service` | безопасный summary PostgreSQL/Hikari | Fixtures; read-only adapter P1 |
+| P0 | `search_knowledge` | `query`, `product`, `version` | trusted snippets + source IDs | knowledge tables |
 
 Каждый инструмент — контракт (имя, типизированные аргументы, размер output, timeout, security policy). Нельзя предоставлять LLM доступ к произвольным таблицам пользователя, JDBC credentials, исходным секретам или shell. **Без соответствующего адаптера tool возвращает `UNAVAILABLE`, а не фабрикует результат.**
 
-### 9.2. MCP без дублирования логики
+### 9.2. MCP без дублирования логики (P1)
 
-`DiagnosticToolPort` реализуется единожды. Для внутреннего GigaChat tool calling он оборачивается в `FunctionToolAdapter`. Для клиентов MCP — в `McpToolAdapter`. Оба проходят одинаковые **проверки аргументов, авторизации, лимитов и redaction**. MCP — транспорт/протокол доступа к инструментам, **не** ещё один AI-движок.
+`DiagnosticToolPort` реализуется единожды. Для внутреннего GigaChat tool calling он оборачивается в `FunctionToolAdapter`. Для клиентов MCP — в `McpToolAdapter`. Оба проходят одинаковые **проверки аргументов, лимитов и redaction**. MCP — транспорт/протокол доступа к инструментам, **не** ещё один AI-движок.
 
-В минимальной образовательной итерации реализовать **один локальный read-only MCP-инструмент** (например, `get_logs`) и проверить его стандартным MCP-клиентом; внешний MCP HTTP endpoint **не публиковать** до настройки независимой аутентификации и сетевого ограничения.
+После MVP-недели можно реализовать **один локальный read-only MCP-инструмент** (например, `get_logs`) и проверить его стандартным MCP-клиентом. MCP работает только локально, наружу не публикуется.
 
 ---
 
@@ -745,25 +734,28 @@ flowchart LR
 
 ### 10.1. Trust boundaries
 
-1. **Стороннее приложение → API:** клиентские токены или HMAC для webhook, TLS, лимит размеров, rate limit, валидация idempotency, отсутствие публичного доступа к чужим инцидентам.
-2. **API → DB:** параметризованный SQL/JPA, миграции Flyway, минимальные права DB-user, отдельные credentials для документационного fetcher при необходимости.
-3. **Инциденты/доки → LLM:** sanitization PII/secrets; injection-resistant system instructions; никакие «команды» из stack traces не исполняются.
-4. **LLM → Tools:** allowlist + schema + argument validation + read-only execution + ACL + запрет произвольных URL/SQL/shell.
-5. **Отчёт → инженер:** роли `VIEWER`, `ENGINEER`, `ADMIN`, аудит подтверждений; браузерная аутентификация, безопасная ссылка на отчёт только после авторизации.
-6. **Notifier → Telegram:** минимальный текст без токенов/логов/PII; чаты/адресаты из конфигурации, а не из LLM.
+**Аутентификация и авторизация вне объёма проекта:** запуск только локальный. Защита сосредоточена на данных: маскировка секретов (пароли, токены, заголовки `Authorization` из событий, строки подключения) регулярными выражениями в `EventSanitizer` до сохранения и до отправки в LLM, с автотестом; tools — только read-only по fixtures.
 
-В MVP — одна независимая установка (single organization / single deployment). **Полноценная multi-tenancy не заявлена**; если понадобится SaaS, потребуется отдельный design: tenant_id, row-level isolation и управление tenant-scoped ключами/индексами.
+1. **Стороннее приложение → API:** лимит размеров payload, валидация idempotency.
+2. **API → DB:** параметризованный SQL, миграции Flyway.
+3. **Инциденты/доки → LLM:** sanitization PII/secrets; injection-resistant system instructions; никакие «команды» из stack traces не исполняются.
+4. **LLM → Tools:** allowlist + schema + argument validation + read-only execution + запрет произвольных URL/SQL/shell.
+5. **Notifier → Telegram (P1):** минимальный текст без токенов/логов/PII; чаты/адресаты из конфигурации, а не из LLM.
+
+Одна локальная установка. **Multi-tenancy не заявлена.**
 
 ### 10.2. Fail-safe правила
 
 - Недоступен GigaChat: событие сохранено, investigation переходит в retry/`FAILED`, команда получает статус без ложного диагноза.
 - Нет мониторинга: анализ проводится на доступных данных; если недостаточно — `INCONCLUSIVE`.
-- Недоступен Telegram: отчёт доступен в UI, notification job повторяется; отсутствие Telegram **не** изменяет статус расследования.
-- Starter не может связаться с Copilot: не блокирует бизнес-операцию; bounded queue/retries и локальная метрика потерь; строгая гарантия потребует опционального outbox.
+- Недоступен Telegram (P1): отчёт доступен в UI, notification job повторяется; отсутствие Telegram **не** изменяет статус расследования.
+- Starter (P1) не может связаться с Copilot: не блокирует бизнес-операцию; bounded queue/retries и локальная метрика потерь; строгая гарантия потребует опционального outbox.
 - Сбой worker: lease истекает, задание подбирается повторно, отчёты/уведомления защищены idempotency keys.
-- Инженер отверг ответ: предыдущая версия неизменна, создаётся новая investigation, не происходит самоподтверждения прежнего AI-вывода.
+- Инженер отверг ответ (P1): предыдущая версия неизменна, создаётся новая investigation, не происходит самоподтверждения прежнего AI-вывода.
 
 ### 10.3. Наблюдаемость самого Copilot
+
+**MVP-неделя:** `/actuator/health` и структурированные логи с `incidentId`/`investigationId`. Метрики ниже — P1.
 
 Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplicated_total`, `work_item_queue_depth`, `investigation_duration_seconds`, `investigation_outcome_total`, `tool_calls_total`, `tool_failures_total`, `llm_requests_total`, `llm_errors_total`, `tokens_input/output`, `notification_failures_total`, `knowledge_last_successful_sync_timestamp`. Trace/span IDs связывают HTTP приём, job, LLM и tools; промпты целиком и секреты в логи не записывать.
 
@@ -771,36 +763,36 @@ Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplic
 
 ## 11. Функциональные требования (FR) и критерии приёмки
 
-Приоритеты: **P0** — основа первого сквозного продукта; **P1** — расширение после доказанного vertical slice.
+Приоритеты: **P0** — входит в учебную неделю (первый сквозной сценарий); **P1** — расширение после доказанного vertical slice.
 
 | ID | Приоритет | Требование | Критерий приёмки |
 |---|---|---|---|
-| FR-01 | P0 | Универсальная схема `IncidentEvent` для REST/Webhook/ручного ввода | HTTP, DB, JVM, DLT нормализуются в единый Domain type |
-| FR-02 | P0 | Автоматическое получение событий через REST и Webhook | POST возвращает `202` только после durable commit |
+| FR-01 | P0 | Универсальная схема `IncidentEvent` для REST и ручного ввода | Событие сценария и ручной ввод нормализуются в единый Domain type |
+| FR-02 | P0 | Автоматическое получение событий через REST (Webhook-адаптеры — P1) | POST возвращает `202` только после durable commit |
 | FR-03 | P0 | Ручной ввод ошибки и stack trace | Можно начать investigation без настроенного мониторинга |
 | FR-04 | P0 | Корреляция и идемпотентность | Повтор `(source,eventId)` не создаёт нового event/job |
 | FR-05 | P0 | Асинхронная очередь заданий в PostgreSQL | События не теряются при рестарте worker после commit |
 | FR-06 | P0 | Базовый сбор доступного диагностического контекста | Для каждого факта указан источник, отсутствующее не выдумывается |
 | FR-07 | P0 | GigaChat: гипотезы, выбор tool, интерпретация, вердикт | Тестовый инцидент проходит tool-call цикл и возвращает structured decision |
-| FR-08 | P0 | RAG по официальным документам соответствующих версий | Retriver отбрасывает несовместимые/неутверждённые знания |
-| FR-09 | P0 | Многошаговое расследование с бюджетами и проверками | Max iterations не превышен; no fabricated evidence IDs |
+| FR-08 | P0 | RAG: локальные документы `src/main/resources/knowledge/` → chunks + embeddings → hybrid search (FTS + vector) с фильтром версии | Retriever отбрасывает несовместимые/неутверждённые знания; chunks нужной версии попадают в контекст LLM |
+| FR-09 | P0 | Многошаговое расследование с бюджетами и gates `SCHEMA` + `EVIDENCE` | Max iterations не превышен; no fabricated evidence IDs |
 | FR-10 | P0 | Один итоговый вердикт, факты, последствия, рекомендации | В пользовательском отчёте нет альтернатив/URL/раздела «не хватает данных» |
 | FR-11 | P0 | Корректный исход `INCONCLUSIVE`/`FAILED` | При недостаточных фактах нет фиктивного `DIAGNOSED` |
-| FR-12 | P0 | Уведомление инженеру и веб-просмотр | После успешного отчёта Telegram получает краткое уведомление + ссылку на UI |
-| FR-13 | P0 | Feedback: confirm/reject/comment и alternative | Новое расследование хранится отдельной версией, приходит новое уведомление |
-| FR-14 | P0 | Добавление evidence и фиксация исправления | Feedback и resolve сохраняются независимо от диагноза |
-| FR-15 | P0 | Симулятор с hidden ground truth | Агент не видит правильный ответ в prompts/RAG/tool response |
-| FR-16 | P0 | Evaluation на синтетических сценариях | Отчёт содержит accuracy, grounding, safety и частоту inconclusive |
-| FR-17 | P0 | Безопасность/санитизация | Секреты не попадают в LLM и Telegram в автоматических тестах |
+| FR-12 | P1 | Уведомление инженеру и веб-просмотр | После успешного отчёта Telegram получает краткое уведомление + ссылку на UI |
+| FR-13 | P1 | Feedback `CONFIRM`/`REJECT`/`COMMENT` и расследование `ALTERNATIVE` | Новое расследование хранится отдельной версией, приходит новое уведомление |
+| FR-14 | P1 | Добавление evidence и фиксация исправления | Feedback и resolve сохраняются независимо от диагноза |
+| FR-15 | P0 | Симулятор с hidden ground truth (сценарий `DB_POOL_EXHAUSTED`) | Агент не видит правильный ответ в prompts/RAG/tool response |
+| FR-16 | P0 (минимум) / P1 (полный) | Evaluation на синтетических сценариях | P0: тест сверяет `category` с `expected.json` и проверяет отсутствие утечки эталона. P1: accuracy, grounding, safety, частота inconclusive |
+| FR-17 | P0 | Безопасность/санитизация | Секреты не попадают в БД, LLM (и Telegram в P1) в автоматических тестах |
 | FR-18 | P1 | Spring Boot Starter AutoConfiguration | Добавление зависимости + YAML + тестовый сервис отправляет событие |
 | FR-19 | P1 | Kafka DLT Adapter / Alertmanager adapter | DLT и Alertmanager payload преобразуются в тот же `IncidentEvent` |
 | FR-20 | P1 | Регулярный sync официальных документов | Неизменённые документы не переиндексируются; версии сохраняются |
 | FR-21 | P1 | Knowledge Promotion UI/workflow | Без подтверждённой проверки AI-результат не попадает в approved RAG |
-| FR-22 | P1 | MCP server с read-only tools | Внешний авторизованный клиент вызывает `get_logs`, бизнес-логика общая |
+| FR-22 | P1 | MCP server с read-only tools | Локальный MCP-клиент вызывает `get_logs`, бизнес-логика общая |
 | FR-23 | P1 | Согласуемые действия (без production-изменений в MVP) | Разрешения проверяются вне LLM; неподтверждённое действие запрещено |
-| FR-24 | P1 | Дополнительные каналы webhook, OIDC и расширенные роли | Интеграционные тесты auth и маршрутизации |
+| FR-24 | P1 | Дополнительные каналы webhook | Интеграционные тесты маршрутизации |
 
-**Дополнение по статусу Starter:** он является обязательным **продуктовым требованием**, но его полноценная реализация отложена до стабилизации `POST /events` и core pipeline. Для демонстрации подключаемости в раннем MVP сначала используем отдельный Java-клиент либо минимальный proof-of-concept starter. Этот сдвиг по фазам — не отказ от FR-18.
+**Дополнение по статусу Starter:** он является обязательным **продуктовым требованием**, но его реализация отложена до стабилизации `POST /events` и core pipeline: starter только доставляет события на сервер, без работающего сервера он бесполезен. В MVP-неделю события отправляются curl/HTTP-файлом и симулятором. Этот сдвиг по фазам — не отказ от FR-18.
 
 ---
 
@@ -814,7 +806,7 @@ Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplic
 | NFR-04 | Latency | При локальном тестовом стенде `POST /events` p95 ≤ **500 мс** при 20 RPS и payload ≤ 16 KB, без учёта холодного запуска; проверяется нагрузочным тестом |
 | NFR-05 | Investigation time | Для простого synthetic scenario целевое время до отчёта ≤ **60 сек** при доступном API; не SLA провайдера, замер p50/p95 отдельно |
 | NFR-06 | Resource budgets | Настраиваемые лимиты iterations, tool calls, токенов, размера контекста, времени и параллельных расследований |
-| NFR-07 | Безопасность | TLS, auth, роли, redaction, allowlisted tools/docs, SSRF и prompt-injection mitigation |
+| NFR-07 | Безопасность | TLS к GigaChat, redaction, allowlisted tools/docs, SSRF и prompt-injection mitigation |
 | NFR-08 | Достоверность | Никаких несуществующих Evidence IDs и «подтверждённых» причин лишь по тексту LLM; проверка отчёта вне модели |
 | NFR-09 | Версионность знаний | Каждый chunk связан с source/version/trust; исключение несовместимых версий; датированная синхронизация |
 | NFR-10 | Хранение | Настраиваемый retention, например raw incident evidence 30 дней, отчёты 180 дней (значения **начальные настройки**, подлежат согласованию) |
@@ -828,6 +820,8 @@ Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplic
 | NFR-18 | Extensibility | Новый `EvidenceSourcePort` или `NotificationPort` подключается без изменения core use cases |
 
 **Важно:** NFR-04 и NFR-05 — целевые требования, а не уже достигнутые характеристики. Перед окончательной фиксацией SLA нужен реальный нагрузочный тест.
+
+**MVP-неделя проверяет:** NFR-01, NFR-02, NFR-05 (ручной замер), NFR-06 (лимит итераций и tool calls), NFR-08, NFR-09, NFR-13 (unit + Testcontainers + deterministic simulator), NFR-14 (Docker Compose для БД), NFR-15. Остальные — P1: NFR-03 (Starter), NFR-04 (нагрузочный тест), NFR-07 в полном объёме (SSRF при загрузке документов с сайтов), NFR-10, NFR-11, NFR-12, NFR-16, NFR-17, NFR-18.
 
 ---
 
@@ -844,7 +838,7 @@ Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplic
 | `JVM_HEAP_GROWTH` | Высокая heap/GC нагрузка | Симулированное удержание объектов | heap/GC metrics, logs, docs (P1 расширение) |
 | `DLT_DESERIALIZATION` | DLT bad JSON/schema | Несовместимость структуры сообщения | DLT attrs, logs, schema/version info (P1) |
 
-**Первый vertical slice:** `HTTP500_NPE` либо `DB_POOL_EXHAUSTED` с полной цепочкой. Не добавлять все шесть глубоко до прохождения одного end-to-end.
+**Первый vertical slice (MVP-неделя): `DB_POOL_EXHAUSTED`** с полной цепочкой. Выбран вместо `HTTP500_NPE`, потому что для него RAG действительно полезен (механизм HikariCP и границы транзакций Spring), а NPE диагностируется по одному stack trace. Остальные сценарии — P1; не добавлять их до прохождения одного end-to-end.
 
 ### 13.2. Устройство fixture
 
@@ -854,13 +848,16 @@ scenario/
   logs.json
   metrics.json
   traces.json
-  changes.json
+  db_activity.json
+  changes.json       # P1 (get_recent_changes)
   expected.json      # никогда не доступен агенту, только evaluator
 ```
 
 `expected.json`: `actualRootCause`, `requiredEvidenceIds`, `acceptableFindings`, `unsafeActions`, `expectedStatus` и допустимые альтернативные формулировки. Агент запускается через тот же `InvestigationOrchestrator`, что и в обычной работе.
 
-### 13.3. Метрики качества
+### 13.3. Метрики качества (P1)
+
+В MVP-неделю — один тест: итоговая `category` совпадает с `expected.json`, а содержимое `expected.json` не встречается ни в промптах, ни в chunks, ни в ответах tools.
 
 - **Root-cause accuracy:** совпадение главной гипотезы с эталоном на случаях с достаточными данными.
 - **Evidence grounding:** доля значимых утверждений, подкреплённых существующими сведениями.
@@ -880,49 +877,51 @@ scenario/
 incident-copilot/
 ├── README.md                       # этот документ: исходный продуктовый контракт
 ├── CLAUDE.md                       # краткие правила работы агента, ссылки на SDD
-├── docs/
-│   ├── mission.md                  # зачем продукт и для кого
-│   ├── tech-stack.md               # проверенные версии и зависимости
-│   ├── roadmap.md                  # итерации/демо/критерии
-│   ├── adr/                         # только решения, требующие обоснования
-│   └── specs/
-│       └── 001-incident-ingestion/
-│           ├── requirements.md
-│           ├── design.md
-│           ├── tasks.md
-│           └── validation.md
-├── copilot-core/                   # domain + ports + pure policies
-├── copilot-server/                 # Spring Boot app, use cases + adapters
-│   └── src/main/java/.../
-│       ├── incident/               # API intake, grouping, states
-│       ├── investigation/          # Orchestrator, context, validator
-│       ├── knowledge/              # RAG, sync, promotion
-│       ├── integration/            # GigaChat, MCP, tools, notifications
-│       └── infrastructure/         # JPA/JDBC, work queue, security
-├── copilot-simulator/              # dev/test fixtures + evaluators
-├── copilot-spring-boot-starter/     # лёгкий клиент и autoconfiguration, P1
-├── docker-compose.yml
+├── specs/
+│   ├── mission.md                  # миссия, аудитория, ценность, тон, критерий успеха и НЕ-цели v1
+│   ├── tech-stack.md               # стек с обоснованием, стратегия тестов, готовность, стиль коммитов
+│   ├── roadmap.md                  # фазы реализации с чекбоксами (фаза = ветка = PR)
+│   └── 001-incident-ingestion/     # спека фичи
+│       ├── requirements.md
+│       ├── design.md
+│       ├── tasks.md
+│       └── validation.md
+├── pom.xml                         # один Maven-модуль
+├── src/main/java/dev/polina/copilot/
+│   ├── domain/                     # Incident, Investigation, Evidence, AiDecision, правила состояний
+│   ├── application/                # use cases: приём события, оркестратор, контекст, валидатор
+│   ├── port/                       # LlmGateway, DiagnosticToolPort, KnowledgeRetrieverPort, репозитории
+│   ├── adapter/in/                 # REST controllers, worker
+│   ├── adapter/out/                # PostgreSQL, GigaChat, pgvector, tools по fixtures
+│   └── simulator/                  # загрузка сценариев (dev/test)
+├── src/main/resources/
+│   ├── db/migration/               # Flyway
+│   ├── knowledge/                  # 5–10 документов для RAG (front-matter: product/version/status)
+│   └── scenarios/DB_POOL_EXHAUSTED/ # fixtures; expected.json читает только evaluator
+├── docker-compose.yml              # PostgreSQL 16 + pgvector
 └── .github/workflows/ci.yml        # P1; если GitLab, адаптировать CI
 ```
 
-**Профили и сборка:** Maven multi-module, Flyway migrations, Spring Web MVC, Spring Security, Spring Data JDBC/JPA по необходимости (не смешивать без причины), Spring AI, Jackson, PostgreSQL, pgvector, Micrometer/Actuator, Testcontainers + JUnit/Mockito, Docker Compose. Для frontend — Spring MVC + Thymeleaf, без React/Node как обязательных компонентов. Для ретраев HTTP/LLM — bounded retry policy с jitter и rate limits. Дизайн и API остаются технологически заменяемыми через порты.
+`copilot-spring-boot-starter` (P1) появится отдельным модулем или репозиторием, когда понадобится.
 
-`docs/specs` — наш выбранный формат. Если подключён конкретный SDD-плагин курса с собственной convention, **согласовать его реальные имена команд и файлов**, а не запускать выдуманные `/spec-*` команды. `CLAUDE.md` не заменяет requirements/design/tasks, а задаёт агенту постоянные правила работы. `/init` опционален и нужен только для начальной подготовки `CLAUDE.md`.
+**Профили и сборка:** один Maven-модуль, Flyway migrations, Spring Web MVC, JdbcTemplate / Spring Data JDBC (без JPA), Spring AI (или прямой REST-клиент к GigaChat — по итогам спайка), Jackson, PostgreSQL, pgvector, Actuator, Testcontainers + JUnit/Mockito, Docker Compose. P1: Micrometer, Spring MVC + Thymeleaf (без React/Node как обязательных компонентов). Для ретраев HTTP/LLM — bounded retry policy с jitter и rate limits. Дизайн и API остаются технологически заменяемыми через порты.
 
-### 14.1. Упрощённая зависимость модулей
+`specs/` — формат курса. Если подключён конкретный SDD-плагин курса с собственной convention, **согласовать его реальные имена команд и файлов**, а не запускать выдуманные `/spec-*` команды. `CLAUDE.md` не заменяет requirements/design/tasks, а задаёт агенту постоянные правила работы. `/init` опционален и нужен только для начальной подготовки `CLAUDE.md`.
+
+### 14.1. Зависимости между пакетами
 
 ```mermaid
 flowchart LR
-   CORE[copilot-core<br/>Domain + Ports]
-   SERVER[copilot-server<br/>Application + Adapters]
-   SIM[copilot-simulator<br/>Fixtures + Evals]
-   STARTER[copilot-spring-boot-starter<br/>HTTP client + Spring AutoConfiguration]
-   SERVER --> CORE
-   SIM --> SERVER
-   STARTER -.->|HTTP API contract, НЕ Java dependency| SERVER
+   ADIN[adapter.in<br/>REST, worker] --> APP[application<br/>use cases]
+   APP --> PORT[port<br/>интерфейсы]
+   APP --> DOM[domain]
+   PORT --> DOM
+   ADOUT[adapter.out<br/>PostgreSQL, GigaChat, tools] -.->|реализует| PORT
+   SIM[simulator] --> ADIN
+   STARTER[Starter, P1] -.->|HTTP API contract, НЕ Java dependency| ADIN
 ```
 
-`copilot-core` — без внешних фреймворков; модули по feature внутри server могут быть Java packages, **не** по отдельному Maven-модулю каждый. Вложенность должна быть оправдана; не создавать интерфейс для каждого DTO и класса.
+`domain` и `application` — без импортов Spring AI, JPA, GigaChat SDK (NFR-01). Вложенность должна быть оправдана; не создавать интерфейс для каждого DTO и класса — порты только на реальных внешних границах.
 
 ---
 
@@ -935,27 +934,17 @@ flowchart LR
 1. Открыть репозиторий. Выполнить `git status`, `git branch --show-current`, `git remote -v`. Если репо уже клонирован, **не делать `git init`**.
 2. Проверить существующий `CLAUDE.md` и SDD-структуру. Создать/актуализировать `CLAUDE.md` (опционально `/init`), не перезаписывая существующие инструкции.
 3. В Plan Mode прочитать этот README и выдать список технологических предположений для проверки; **не изменять код до подтверждения плана**.
-4. Подготовить `docs/mission.md`, `docs/tech-stack.md`, `docs/roadmap.md`. Учитывать требования этого README; не создавать противоречащие версии.
+4. Поддерживать `specs/mission.md`, `specs/tech-stack.md`, `specs/roadmap.md`. Учитывать требования этого README; не создавать противоречащие версии.
 5. Сделать отдельные технические spikes: доступ к GigaChat API/TLS; function calling; embedding model/dimension; structured output capability; Spring AI compatibility. Сохранить выводы.
 6. Подготовить SDD-спецификацию **одного** первого сценария: requirements → design → tasks → validation. Получить подтверждение архитектурного плана.
-7. Создать ветку `feature/incident-ingestion` или актуальную по команде; маленькие PR/коммиты после проверяемых изменений.
+7. Одна фаза roadmap = одна ветка `phase-<N>-<name>` и один PR; маленькие коммиты после проверяемых изменений (стиль — в `specs/tech-stack.md`).
 8. Перед каждым коммитом: `git diff`, тесты, объяснение затронутых классов и архитектурных границ. Никаких автоматических `push`, merge и изменений инфраструктуры без согласования.
 
-### 15.2. Этапы реализации (MVP / потом)
+### 15.2. Этапы реализации (MVP-неделя / потом)
 
-| Этап | Результат | Выходной критерий |
-|---|---|---|
-| **0. Provider spikes** | GigaChat chat/functions/embeddings/TLS проверены, версии закреплены | проверяемые ответы/API, нет неработающих предположений |
-| **1. Incident intake** | REST + Domain + PostgreSQL schema + dedupe + work queue | `202`, повторный event не создаёт дубликаты, worker restart test |
-| **2. Simulator + baseline** | Один воспроизводимый инцидент + tools | факты приходят из fixture, ground truth скрыт |
-| **3. LLM integration** | Контекст, prompts, `AiDecision`, tool cycle | разбор проходит минимум один вызов инструмента |
-| **4. RAG** | Versioned docs + pgvector + hybrid retrieval | не выдаёт неутверждённые/несовместимые chunks |
-| **5. Verdict** | gates + immutable report versions + failed/inconclusive | нет вымышленных доказательств, один основной вывод |
-| **6. Human interaction** | UI минимальный, Telegram, feedback, alternative, resolve | новый feedback -> новая version -> уведомление |
-| **7. Product hardening** | безопасность, метрики, evaluations, Docker Compose | тесты отказа LLM, worker, Telegram, retention |
-| **8. Integrations P1** | Starter, DLT adapter, MCP, updater docs | контрактные и интеграционные проверки |
+Фазы, их порядок и критерии приёмки — в [`specs/roadmap.md`](specs/roadmap.md): setup → ingestion → queue → simulator → orchestrator → report → gigachat → knowledge → rag. Что сознательно не делаем в v1 — в разделе «НЕ-цели v1» [`specs/mission.md`](specs/mission.md).
 
-**Реалистичность сроков:** семь дней по 4 часа — **учебный vertical slice**, не обещание полностью завершить все P0/P1. Продолжительность определяется тестами и прогрессом, а не количеством сгенерированных строк кода.
+**Реалистичность сроков:** ориентир — 7–9 сессий по 2 часа, запаса нет. Если GigaChat блокирует — работаем на `ScriptedLlmGateway`, RAG только на FTS. Продолжительность определяется тестами и прогрессом, а не количеством сгенерированных строк кода.
 
 ### 15.3. Что должна самостоятельно уметь объяснить разработчица
 
@@ -981,21 +970,22 @@ flowchart LR
 | GigaChat API key / tier недоступен или нет strict JSON schema | Spike; fallback via validated output; конфигурируемый provider adapter |
 | Нет живых логов/метрик у подключённого клиента | `INCONCLUSIVE` или ограниченный анализ; не симулировать реальные факты |
 | Модель выдаёт убедительную, но ложную гипотезу | evidence IDs, gates, evals, человеческое подтверждение, ограничения |
-| РAG находит несовместимые версии | product/version filter, provenance, статус APPROVED |
+| RAG находит несовместимые версии | product/version filter, provenance, статус APPROVED |
 | Queue перенаполняется, worker падает | leases/retry/backpressure, metrics, idempotent operations |
 | Starter начинает влиять на бизнес request | bounded async best-effort, отсутствие исключений/блокировок по умолчанию |
-| Утечка данных в модель/Telegram | sanitization, security review, минимальный телеграм-текст, ACL |
+| Утечка данных в модель/Telegram | sanitization, security review, минимальный телеграм-текст |
 | Неограниченная стоимость LLM | budget tokens/time/tool calls/parallelism и метрики затрат |
 | MCP endpoint выставлен наружу без auth | локальный/закрытый режим до отдельной настройки защиты |
-| Слишком сложная архитектура для 1 недели | один сквозной сценарий, порты только на реальных boundaries |
+| Слишком сложная архитектура для 1 недели | один Maven-модуль, один сквозной сценарий, P0/P1-разметка, порты только на реальных boundaries |
+| GigaChat недоступен в учебную неделю (TLS-сертификат, лимиты) | `ScriptedLlmGateway` для всего pipeline; RAG только на FTS |
 
-**Решения, требующие отдельной проверки перед production:** реальные лимиты и тарификация GigaChat, условия обработки данных провайдером, версии поддерживаемых инструментов, сертификаты/TLS, политики конфиденциальности, требования к SLA, роль команды/аутентификация, долговременное хранение диагностики.
+**Решения, требующие отдельной проверки перед production:** реальные лимиты и тарификация GigaChat, условия обработки данных провайдером, версии поддерживаемых инструментов, сертификаты/TLS, политики конфиденциальности, требования к SLA, аутентификация и авторизация (вне объёма учебного проекта), долговременное хранение диагностики.
 
 ---
 
 ## 17. Официальные технические источники
 
-Актуальность перечисленных ресурсов следует повторно проверять перед реализацией. Версии закрепляются в `docs/tech-stack.md` после spike-тестов.
+Актуальность перечисленных ресурсов следует повторно проверять перед реализацией. Версии закрепляются в `specs/tech-stack.md` после spike-тестов.
 
 - [Spring AI 1.1 Getting Started](https://docs.spring.io/spring-ai/reference/1.1/getting-started.html) — проверять совместимость с Spring Boot 3.5.x; если указанный путь изменился, перейти на версионный раздел справочника.
 - [Spring AI RAG](https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html) — retrieval и Advisors; текущая главная документация может описывать Spring AI 2.x.
@@ -1013,7 +1003,18 @@ flowchart LR
 
 ---
 
-## 18. Definition of Done — проект считается работающим MVP, если
+## 18. Definition of Done
+
+### 18.1. DoD учебной недели (P0)
+
+1. `docker compose up` поднимает PostgreSQL + pgvector; приложение стартует, миграции Flyway применены.
+2. `POST /api/v1/simulator/scenarios/DB_POOL_EXHAUSTED/run` (или `POST /api/v1/events`) возвращает `202` после commit; повтор того же `(source, eventId)` не создаёт дубликатов.
+3. Задание переживает рестарт worker (тест).
+4. Через ≤ 60 с `GET /api/v1/incidents/{id}/report` возвращает `DIAGNOSED` с фактами из fixture либо честный `INCONCLUSIVE`.
+5. LLM вызвала минимум один tool; в её контекст попали chunks нужной версии со статусом `APPROVED`.
+6. Тесты зелёные: идемпотентность, рестарт worker, несуществующий `evidenceId` отклоняется gate `EVIDENCE`, секреты замаскированы, эталон `expected.json` не утекает.
+
+### 18.2. DoD полного MVP (P0 + P1)
 
 1. REST-клиент/симулятор создаёт событие, API отдаёт `202` после commit, клиент получает `incidentId`.
 2. Инцидент и фоновое задание переживают перезапуск server/worker; повтор события идемпотентен.
@@ -1027,7 +1028,3 @@ flowchart LR
 10. Никакой ответ LLM не превращается в подтверждённое знание без проверяемого human-review и фактического результата.
 11. Минимальный CI/test suite охватывает idempotency, retry, security, LLM unavailable, incorrect hypothesis и evaluator without ground-truth leakage.
 12. Проект поднимается документированной командой Docker Compose; README/SDD описывает запуск и ограничения текущей реализации.
-
----
-
-**Продуктовая формула:** «Подключил источник ошибок → система собрала доступные факты → обоснованно расследовала → сообщила одну главную гипотезу и план исправления → инженер подтвердил либо инициировал следующую версию расследования». Ожидаемая ценность возникает из **снижения ручного сбора и анализа контекста**, а не из самой по себе генерации текста LLM.
