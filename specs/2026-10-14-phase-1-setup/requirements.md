@@ -51,7 +51,7 @@
 
 - Docker не запущен → интеграционные тесты падают с ошибкой Testcontainers; это ожидаемое поведение, требование описано в README/CLAUDE.md.
 - Повторный старт приложения → Flyway видит применённую V1 и ничего не меняет.
-- Порт 5432 занят локальной PostgreSQL → `docker compose up` падает; решение — остановить локальную БД или переопределить порт (`DB_URL`).
+- Порт 5432 занят локальной PostgreSQL → `docker compose up` падает; решение — остановить локальную БД или сменить порт: `DB_PORT=5433` для `docker compose` и `DB_URL=jdbc:postgresql://localhost:5433/copilot` для приложения.
 - Изменение уже применённой V1 → Flyway падает на checksum. Правило: только новые миграции.
 
 ## Допущения
@@ -76,3 +76,5 @@
 5. **Тесты:** отдельного контекстного теста нет — его роль выполняет `HealthEndpointTest`; ручная проверка «`/actuator/env` → 404» дополнительно автоматизирована. HTTP в тесте — `RestClient` + `RANDOM_PORT`: в Boot 4 `TestRestTemplate` вынесен в отдельный модуль `spring-boot-resttestclient`.
 6. **Flyway** хранит `flyway_schema_history` в схеме `public` (по умолчанию).
 7. **Стиль коммитов:** три коммита фазы сначала были оформлены как `build(setup)` (×2) и `feat(db)` вопреки `tech-stack.md`; до push сообщения переписаны в `chore(setup)` и `feat(setup)`, содержимое не менялось.
+8. **Code review (`/code-review high`) → миграция `V2__integrity_constraints.sql`** (V1 не редактируем): CHECK «`LEASED` ⇒ заполнены `leased_until` и `lease_owner`»; составной FK `(investigation_id, incident_id)` у `evidence` и `work_items` — нельзя сослаться на расследование чужого инцидента; индексы `incident_events(incident_id)`, `evidence(investigation_id)`. `docker-compose.yml`: порт только на `127.0.0.1` и настраивается через `DB_PORT`.
+9. **Из code review отложено:** UNIQUE-идентичность `knowledge.sources` (7a, см. п. 4); запрет Telegram в ArchUnit-правиле (P1, когда будет выбрана библиотека); обновление `updated_at`, `allowEmptyShould` и общий базовый класс интеграционных тестов — в roadmap фазы 2.

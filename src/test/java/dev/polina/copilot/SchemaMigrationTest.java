@@ -79,6 +79,30 @@ class SchemaMigrationTest {
                 .hasMessageContaining("1024");
     }
 
+    @Test
+    @DisplayName("задание LEASED без leased_until и lease_owner отклоняется")
+    void rejectsLeasedWorkItemWithoutLease() {
+        assertThatThrownBy(() -> insertWorkItem("LEASED", null, null))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    @DisplayName("задание LEASED с заполненным lease сохраняется")
+    void acceptsLeasedWorkItemWithLease() {
+        insertWorkItem("LEASED", "now() + interval '5 minutes'", "'worker-1'");
+    }
+
+    @Test
+    @DisplayName("evidence не может ссылаться на расследование другого инцидента")
+    void rejectsEvidenceOfForeignInvestigation() {
+        UUID incidentA = insertIncident("OPEN");
+        UUID incidentB = insertIncident("OPEN");
+        UUID investigationOfA = insertInvestigation(incidentA);
+
+        assertThatThrownBy(() -> insertEvidence(incidentB, investigationOfA))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
     private java.util.List<String> tablesIn(String schema) {
         return jdbc.sql("""
                         SELECT table_name FROM information_schema.tables
@@ -103,6 +127,28 @@ class SchemaMigrationTest {
                         VALUES (?, ?, ?, ?, now(), '{}'::jsonb)
                         """)
                 .params(UUID.randomUUID(), incidentId, source, eventId).update();
+    }
+
+    private void insertWorkItem(String status, String leasedUntilSql, String leaseOwnerSql) {
+        jdbc.sql("INSERT INTO ops.work_items (id, kind, status, leased_until, lease_owner) VALUES (?, 'INVESTIGATE', ?, "
+                        + (leasedUntilSql == null ? "NULL" : leasedUntilSql) + ", "
+                        + (leaseOwnerSql == null ? "NULL" : leaseOwnerSql) + ")")
+                .params(UUID.randomUUID(), status).update();
+    }
+
+    private UUID insertInvestigation(UUID incidentId) {
+        UUID id = UUID.randomUUID();
+        jdbc.sql("INSERT INTO ops.investigations (id, incident_id, version, status) VALUES (?, ?, 1, 'QUEUED')")
+                .params(id, incidentId).update();
+        return id;
+    }
+
+    private void insertEvidence(UUID incidentId, UUID investigationId) {
+        jdbc.sql("""
+                        INSERT INTO ops.evidence (id, incident_id, investigation_id, kind, origin, observed_at, content, digest)
+                        VALUES (?, ?, ?, 'LOG', 'simulator', now(), '{}'::jsonb, 'd-1')
+                        """)
+                .params(UUID.randomUUID(), incidentId, investigationId).update();
     }
 
     private UUID insertSource() {
