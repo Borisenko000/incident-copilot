@@ -34,6 +34,7 @@ mvn test -Dtest=ClassName#method              # один тест
 - Сначала план, потом код: не писать production-код, не менять файлы и не коммитить до подтверждения плана пользователем.
 - Перед кодом — technical spikes: GigaChat API/TLS, function calling, embeddings (размерность), structured output (`json_schema`), совместимость Spring AI 1.1.x со Spring Boot 3.5.x. Версии закрепляются в `specs/tech-stack.md`.
 - Реализовывать по фазам из `specs/roadmap.md`, небольшими задачами с diff, тестами и объяснением. Pipeline сначала строится на `ScriptedLlmGateway` (fake), GigaChat подключается после спайка.
+- Перед каждым `commit` и `push` показать список файлов, diff (или краткую сводку для больших) и сообщение коммита — и ждать явного подтверждения. Просьба «закоммить и запушь» не отменяет этот шаг.
 - Коммиты — Conventional Commits (см. `specs/tech-stack.md`); никаких автоматических `push`/merge/изменений инфраструктуры без согласования.
 - Не добавлять Kafka/Redis/Elasticsearch/K8s/микросервисы — только через ADR при измеренной необходимости.
 
