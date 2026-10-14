@@ -69,4 +69,10 @@
 
 ## Отклонения
 
-_Заполняется во время реализации: что сделали не так, как описано выше, и почему._
+1. **Spring Boot 4.1.1 собрался**, откат на 3.5.x не понадобился. Версии из BOM Boot: Testcontainers 2.0.5, Flyway 12.4.0, драйвер PostgreSQL 42.7.13; ArchUnit 1.5.1 — явно в `pom.xml`.
+2. **V1 сверх перечисленного:** `DEFAULT now()` у `created_at`/`updated_at`/`received_at` (у `id` DEFAULT по-прежнему нет); `CHECK (attempts >= 0)` и `CHECK (version > 0)`; явные имена UNIQUE-ограничений; `knowledge.chunks` → `sources` с `ON DELETE CASCADE`.
+3. **`knowledge.chunks.embedding` nullable** — по README §8.2 без embeddings поиск работает только по FTS.
+4. **Не добавлено** (появится новыми миграциями под реальные запросы): CHECK для `kind`/`severity`, UNIQUE на `knowledge.sources.origin_uri` (фаза 7a), индекс по `fingerprint` для корреляции (фаза 2).
+5. **Тесты:** отдельного контекстного теста нет — его роль выполняет `HealthEndpointTest`; ручная проверка «`/actuator/env` → 404» дополнительно автоматизирована. HTTP в тесте — `RestClient` + `RANDOM_PORT`: в Boot 4 `TestRestTemplate` вынесен в отдельный модуль `spring-boot-resttestclient`.
+6. **Flyway** хранит `flyway_schema_history` в схеме `public` (по умолчанию).
+7. **Стиль коммитов:** три коммита фазы сначала были оформлены как `build(setup)` (×2) и `feat(db)` вопреки `tech-stack.md`; до push сообщения переписаны в `chore(setup)` и `feat(setup)`, содержимое не менялось.
