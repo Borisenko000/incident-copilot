@@ -7,9 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Проект на стадии спецификации; код пока — заглушка IntelliJ (`src/main/java/dev/polina/Main.java`), Java 21, без зависимостей. Источники правды:
 - `README.md` — архитектура и требования; части помечены **P0** (учебная неделя) и **P1** (позже). P1 без явной просьбы не реализовывать.
 - `specs/mission.md` — миссия, аудитория, тон, критерий успеха и **НЕ-цели v1** (в README не дублируется).
-- `specs/roadmap.md` — фазы с чекбоксами; одна фаза = ветка `phase-<N>-<name>` = один PR.
-- `specs/tech-stack.md` — стек, стратегия тестов (где TDD), определение готовности, стиль коммитов.
-- `specs/NNN-<feature>/{requirements,design,tasks,validation}.md` — спеки фич.
+- `specs/roadmap.md` — фазы с чекбоксами; одна фаза = ветка `feature/phase-<N>-<name>` = один PR.
+- `specs/tech-stack.md` — стек и версии, стратегия тестов (где TDD), определение готовности, стиль коммитов.
+- `specs/YYYY-MM-DD-phase-<N>-<name>/{requirements,plan,validation}.md` — спека фазы; в `requirements.md` есть раздел «Отклонения», его читают перед следующей фазой.
 
 Структура — **один Maven-модуль**, слои — пакеты `dev.polina.copilot.{domain, application, port, adapter.in, adapter.out, simulator}` (README §14). Первый и единственный сценарий недели — `DB_POOL_EXHAUSTED`.
 
@@ -32,7 +32,7 @@ mvn test -Dtest=ClassName#method              # один тест
 
 - Проект учебный: в начале фазы сверяться со `specs/learning-plan.md`. Когда навык встречается впервые, до первого кода провести лекцию по формату из этого файла.
 - Сначала план, потом код: не писать production-код, не менять файлы и не коммитить до подтверждения плана пользователем.
-- Перед кодом — technical spikes: GigaChat API/TLS, function calling, embeddings (размерность), structured output (`json_schema`), совместимость Spring AI 1.1.x со Spring Boot 3.5.x. Версии закрепляются в `specs/tech-stack.md`.
+- Перед кодом — technical spikes: GigaChat API/TLS, function calling, embeddings (размерность), structured output (`json_schema`), совместимость Spring AI 2.0.x и GigaChat-стартера со Spring Boot 4.1.x. Версии закрепляются в `specs/tech-stack.md`.
 - Реализовывать по фазам из `specs/roadmap.md`, небольшими задачами с diff, тестами и объяснением. Pipeline сначала строится на `ScriptedLlmGateway` (fake), GigaChat подключается после спайка.
 - Перед каждым `commit` и `push` показать список файлов, diff (или краткую сводку для больших) и сообщение коммита — и ждать явного подтверждения. Просьба «закоммить и запушь» не отменяет этот шаг.
 - Коммиты — Conventional Commits (см. `specs/tech-stack.md`); никаких автоматических `push`/merge/изменений инфраструктуры без согласования.

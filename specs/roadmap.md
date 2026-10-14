@@ -1,18 +1,19 @@
 # Roadmap
 
-Одна фаза = одна ветка `phase-<N>-<name>` и один PR. Сквозной сценарий v1 — `DB_POOL_EXHAUSTED`.
+Одна фаза = одна ветка `feature/phase-<N>-<name>` и один PR. Спека фазы — `specs/YYYY-MM-DD-phase-<N>-<name>/{requirements,plan,validation}.md`. Сквозной сценарий v1 — `DB_POOL_EXHAUSTED`.
 
 ## Фаза 1 — setup
-- [ ] Каркас Spring Boot 3.5, приложение стартует
-- [ ] `docker-compose.yml` с PostgreSQL 16 + pgvector
-- [ ] Flyway-миграции: схемы `ops` и `knowledge`, 7 таблиц
-- [ ] `/actuator/health` отвечает `UP`
+- [x] Каркас Spring Boot 4.1, приложение стартует
+- [x] `docker-compose.yml` с PostgreSQL 16 + pgvector
+- [x] Flyway-миграции: схемы `ops` и `knowledge`, 7 таблиц
+- [x] `/actuator/health` отвечает `UP`
 
 ## Фаза 2 — ingestion
 - [ ] `POST /api/v1/events`: event + incident + investigation(`QUEUED`) + work_item в одной транзакции → `202`
 - [ ] Повтор `(source, eventId)` возвращает тот же `incidentId` и не создаёт дубликатов
 - [ ] `POST /api/v1/incidents` (ручной ввод) и `GET /api/v1/incidents/{id}`
 - [ ] Секреты маскируются до сохранения
+- [ ] Из ревью фазы 1: `updated_at` инцидента обновляется явно при каждом новом событии (тест корреляции); убрать `allowEmptyShould` из `ArchitectureTest`; общий базовый класс интеграционных тестов (один контейнер на прогон)
 
 ## Фаза 3 — queue
 - [ ] Worker забирает задания через `FOR UPDATE SKIP LOCKED` + lease
