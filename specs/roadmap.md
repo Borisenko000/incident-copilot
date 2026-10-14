@@ -1,9 +1,9 @@
 # Roadmap
 
-Одна фаза = одна ветка `phase-<N>-<name>` и один PR. Сквозной сценарий v1 — `DB_POOL_EXHAUSTED`.
+Одна фаза = одна ветка `feature/phase-<N>-<name>` и один PR. Спека фазы — `specs/YYYY-MM-DD-phase-<N>-<name>/{requirements,plan,validation}.md`. Сквозной сценарий v1 — `DB_POOL_EXHAUSTED`.
 
 ## Фаза 1 — setup
-- [ ] Каркас Spring Boot 3.5, приложение стартует
+- [ ] Каркас Spring Boot 4.1, приложение стартует
 - [ ] `docker-compose.yml` с PostgreSQL 16 + pgvector
 - [ ] Flyway-миграции: схемы `ops` и `knowledge`, 7 таблиц
 - [ ] `/actuator/health` отвечает `UP`

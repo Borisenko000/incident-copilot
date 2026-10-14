@@ -21,8 +21,8 @@
 |---|---|---|
 | Архитектура | **Модульный монолит + ports/adapters (Clean/Hexagonal)** | Изолировать ответственность без набора микросервисов |
 | Сборка | **Один Maven-модуль**, слои — пакеты `domain`, `application`, `port`, `adapter.in`, `adapter.out`, `simulator` | Учебный объём; мультимодульная сборка добавляет сложность без пользы для логики. Разделение — P1 при необходимости |
-| Java | **Java 21**, Spring Boot 3.5.x | Практический Java/Spring-стек; точные версии закрепить после smoke-теста |
-| AI-фреймворк | **Spring AI 1.1.x совместимой стабильной версии** | Управление AI-клиентом, RAG и tools; не смешивать примеры от Spring AI 2.x / Boot 4 |
+| Java | **Java 21**, Spring Boot 4.1.x | Практический Java/Spring-стек; 3.5 вышла из OSS-поддержки в июне 2026. Точные версии — в `specs/tech-stack.md` |
+| AI-фреймворк | **Spring AI 2.0.x** (+ GigaChat-стартер 2.0) | Управление AI-клиентом, RAG и tools; не смешивать примеры от Spring AI 1.x / Boot 3 |
 | Модель | **GigaChat** | Практика API без обязательного зарубежного VPN; доступность и ограничения проверить на аккаунте |
 | AI-провайдер | `LlmGateway` + `GigaChatAdapter` | Не связывать Domain и Application со специфичным SDK |
 | Структура | **Один PostgreSQL 16+**, расширение **pgvector** | Операционные данные, очередь и документы в одной транзакционной СУБД |
@@ -458,7 +458,7 @@ Content-Type: application/json
     "offset": 1049,
     "attempts": 3
   },
-  "technology": {"java": "21", "springBoot": "3.5.x"}
+  "technology": {"java": "21", "springBoot": "4.1.x"}
 }
 ```
 
@@ -488,7 +488,7 @@ HTTP 202 означает **принято для обработки**, не «L
   "service": "order-service",
   "environment": "staging",
   "errorText": "SQLTransientConnectionException: Connection is not available",
-  "technology": {"springBoot": "3.5.x", "postgresql": "16"}
+  "technology": {"springBoot": "4.1.x", "postgresql": "16"}
 }
 ```
 
@@ -814,7 +814,7 @@ Actuator + Micrometer / OpenTelemetry: `events_received_total`, `events_deduplic
 | NFR-12 | Наблюдаемость | Actuator/Micrometer и tracing всех основных этапов; очереди, latency, ошибки, расходы LLM |
 | NFR-13 | Тестируемость | Unit, integration (Testcontainers PostgreSQL), contract tests, deterministic simulator, LLM evaluation |
 | NFR-14 | Переносимость | Docker Compose; профили dev/test/prod; нет обязательного Kafka/Redis/K8s |
-| NFR-15 | Совместимость | Java 21 / Spring Boot 3.5 / совместимая ветка Spring AI 1.1; проверка сборкой и provider spike |
+| NFR-15 | Совместимость | Java 21 / Spring Boot 4.1 / совместимая ветка Spring AI 2.0; проверка сборкой и provider spike |
 | NFR-16 | UI usability | Карточка incident отражает актуальный статус, последнюю investigation, исторические версии и доступные решения без сырых токенов |
 | NFR-17 | Сервисная безопасность | Отдельный read-only доступ диагностических адаптеров; минимальные DB privileges, запрет автодействий над production |
 | NFR-18 | Extensibility | Новый `EvidenceSourcePort` или `NotificationPort` подключается без изменения core use cases |
@@ -881,11 +881,10 @@ incident-copilot/
 │   ├── mission.md                  # миссия, аудитория, ценность, тон, критерий успеха и НЕ-цели v1
 │   ├── tech-stack.md               # стек с обоснованием, стратегия тестов, готовность, стиль коммитов
 │   ├── roadmap.md                  # фазы реализации с чекбоксами (фаза = ветка = PR)
-│   └── 001-incident-ingestion/     # спека фичи
-│       ├── requirements.md
-│       ├── design.md
-│       ├── tasks.md
-│       └── validation.md
+│   └── YYYY-MM-DD-phase-N-<name>/  # спека фазы (например 2026-10-14-phase-1-setup)
+│       ├── requirements.md         # объём, решения, контекст, «Отклонения»
+│       ├── plan.md                 # пронумерованные группы задач
+│       └── validation.md           # критерии готовности к слиянию
 ├── pom.xml                         # один Maven-модуль
 ├── src/main/java/dev/polina/copilot/
 │   ├── domain/                     # Incident, Investigation, Evidence, AiDecision, правила состояний
@@ -906,7 +905,7 @@ incident-copilot/
 
 **Профили и сборка:** один Maven-модуль, Flyway migrations, Spring Web MVC, JdbcTemplate / Spring Data JDBC (без JPA), Spring AI (или прямой REST-клиент к GigaChat — по итогам спайка), Jackson, PostgreSQL, pgvector, Actuator, Testcontainers + JUnit/Mockito, Docker Compose. P1: Micrometer, Spring MVC + Thymeleaf (без React/Node как обязательных компонентов). Для ретраев HTTP/LLM — bounded retry policy с jitter и rate limits. Дизайн и API остаются технологически заменяемыми через порты.
 
-`specs/` — формат курса. Если подключён конкретный SDD-плагин курса с собственной convention, **согласовать его реальные имена команд и файлов**, а не запускать выдуманные `/spec-*` команды. `CLAUDE.md` не заменяет requirements/design/tasks, а задаёт агенту постоянные правила работы. `/init` опционален и нужен только для начальной подготовки `CLAUDE.md`.
+`specs/` — формат курса. Если подключён конкретный SDD-плагин курса с собственной convention, **согласовать его реальные имена команд и файлов**, а не запускать выдуманные `/spec-*` команды. `CLAUDE.md` не заменяет requirements/plan/validation, а задаёт агенту постоянные правила работы. `/init` опционален и нужен только для начальной подготовки `CLAUDE.md`.
 
 ### 14.1. Зависимости между пакетами
 
@@ -936,8 +935,8 @@ flowchart LR
 3. В Plan Mode прочитать этот README и выдать список технологических предположений для проверки; **не изменять код до подтверждения плана**.
 4. Поддерживать `specs/mission.md`, `specs/tech-stack.md`, `specs/roadmap.md`. Учитывать требования этого README; не создавать противоречащие версии.
 5. Сделать отдельные технические spikes: доступ к GigaChat API/TLS; function calling; embedding model/dimension; structured output capability; Spring AI compatibility. Сохранить выводы.
-6. Подготовить SDD-спецификацию **одного** первого сценария: requirements → design → tasks → validation. Получить подтверждение архитектурного плана.
-7. Одна фаза roadmap = одна ветка `phase-<N>-<name>` и один PR; маленькие коммиты после проверяемых изменений (стиль — в `specs/tech-stack.md`).
+6. Перед каждой фазой подготовить её спецификацию `specs/YYYY-MM-DD-phase-<N>-<name>/`: requirements → plan → validation. Получить подтверждение плана.
+7. Одна фаза roadmap = одна ветка `feature/phase-<N>-<name>` и один PR; маленькие коммиты после проверяемых изменений (стиль — в `specs/tech-stack.md`).
 8. Перед каждым коммитом: `git diff`, тесты, объяснение затронутых классов и архитектурных границ. Никаких автоматических `push`, merge и изменений инфраструктуры без согласования.
 
 ### 15.2. Этапы реализации (MVP-неделя / потом)
@@ -987,8 +986,9 @@ flowchart LR
 
 Актуальность перечисленных ресурсов следует повторно проверять перед реализацией. Версии закрепляются в `specs/tech-stack.md` после spike-тестов.
 
-- [Spring AI 1.1 Getting Started](https://docs.spring.io/spring-ai/reference/1.1/getting-started.html) — проверять совместимость с Spring Boot 3.5.x; если указанный путь изменился, перейти на версионный раздел справочника.
-- [Spring AI RAG](https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html) — retrieval и Advisors; текущая главная документация может описывать Spring AI 2.x.
+- [Spring AI 2.0.0 GA](https://spring.io/blog/2026/06/12/spring-ai-2-0-0-GA-available-now/) — рассчитана на Spring Boot 4.0/4.1 и Spring Framework 7.0.
+- [Spring AI GigaChat](https://github.com/ai-forever/spring-ai-gigachat) — стартер `chat.giga:spring-ai-starter-model-gigachat`, версия 2.x для Spring AI 2.0 / Boot 4.
+- [Spring AI RAG](https://docs.spring.io/spring-ai/reference/api/retrieval-augmented-generation.html) — retrieval и Advisors.
 - [Spring AI ETL](https://docs.spring.io/spring-ai/reference/api/etl-pipeline.html) — загрузка/трансформация документов.
 - [Spring AI MCP Server](https://docs.spring.io/spring-ai/reference/1.1/api/mcp/mcp-server-boot-starter-docs.html) — MCP-integration в ветке 1.1.
 - [GigaChat API reference](https://developers.sber.ru/docs/ru/gigachat/api/main) — auth, endpoints, SDK и TLS.
