@@ -11,6 +11,8 @@
 | JdbcTemplate / Spring Data JDBC | Нужен явный SQL (`SKIP LOCKED`, pgvector, FTS); JPA здесь мешает |
 | GigaChat (chat + embeddings) | LLM доступна без VPN; размерность embeddings — 1024 по документации, подтвердить на спайке |
 | Spring AI 2.0.x (2.0.1) + `chat.giga:spring-ai-starter-model-gigachat` 2.0.0, или `RestClient` | Клиент к GigaChat; выбор — по итогам спайка (фаза 6), в обоих случаях — за портом `LlmGateway` |
+| Jackson 3.1.5 (из BOM Boot, пакет `tools.jackson`) | JSON для REST и `jsonb`. В Boot 4 по умолчанию Jackson 3; аннотации остаются в `com.fasterxml.jackson.annotation` |
+| Hibernate Validator 9.1.3 (`spring-boot-starter-validation`) | Bean Validation входящих DTO в `adapter.in` |
 | ArchUnit 1.5.1 | Автотест границ слоёв (NFR-01). Версия задаётся в `pom.xml`: BOM Spring Boot её не содержит |
 | Docker Compose | Локальный запуск БД одной командой |
 
