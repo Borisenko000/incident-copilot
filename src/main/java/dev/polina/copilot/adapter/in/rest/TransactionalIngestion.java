@@ -24,4 +24,9 @@ public class TransactionalIngestion {
     public IngestResult ingest(IncidentEvent event) {
         return service.ingest(event);
     }
+
+    @Transactional
+    public IngestResult openManualIncident(IncidentEvent event) {
+        return service.openManualIncident(event);
+    }
 }

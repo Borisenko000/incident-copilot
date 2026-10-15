@@ -5,24 +5,41 @@ import dev.polina.copilot.domain.IncidentStatus;
 import dev.polina.copilot.domain.InvestigationStatus;
 import dev.polina.copilot.domain.Severity;
 import dev.polina.copilot.port.IncidentRepository.IncidentCard;
+import jakarta.validation.Valid;
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-/** GET /api/v1/incidents/{id}: карточка инцидента. Нет инцидента → 404, id не UUID → 400 (оба — ProblemDetail). */
+/**
+ * POST /api/v1/incidents — ручной ввод (всегда новый инцидент, 202);
+ * GET /api/v1/incidents/{id} — карточка. Нет инцидента → 404, id не UUID → 400 (оба — ProblemDetail).
+ */
 @RestController
 @RequestMapping("/api/v1/incidents")
 class IncidentController {
 
     private final IncidentQueryService queries;
+    private final TransactionalIngestion ingestion;
+    private final Clock clock;
 
-    IncidentController(IncidentQueryService queries) {
+    IncidentController(IncidentQueryService queries, TransactionalIngestion ingestion, Clock clock) {
         this.queries = queries;
+        this.ingestion = ingestion;
+        this.clock = clock;
+    }
+
+    @PostMapping
+    ResponseEntity<IngestAcceptedResponse> create(@Valid @RequestBody ManualIncidentRequest request) {
+        return IngestAcceptedResponse.accepted(ingestion.openManualIncident(request.toDomain(clock)));
     }
 
     @GetMapping("/{id}")

@@ -60,6 +60,18 @@ public final class EventSanitizer {
                 sanitizeMap(event.technology()));
     }
 
+    /**
+     * Для ручного ввода: type, service и environment вводит человек, а не система,
+     * поэтому это свободный текст и маскируется так же, как остальные поля.
+     */
+    public IncidentEvent sanitizeManual(IncidentEvent event) {
+        IncidentEvent clean = sanitize(event);
+        return new IncidentEvent(
+                clean.eventId(), clean.source(), clean.occurredAt(),
+                mask(clean.service()), mask(clean.environment()), mask(clean.type()), clean.severity(),
+                clean.summary(), clean.error(), clean.correlation(), clean.attributes(), clean.technology());
+    }
+
     public String mask(String text) {
         if (text == null) {
             return null;

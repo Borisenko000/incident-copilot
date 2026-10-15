@@ -55,6 +55,17 @@ public final class IngestEventService {
         return openNewIncident(event, fingerprint, now);
     }
 
+    /**
+     * Ручной ввод (FR-03): всегда новый инцидент со своим расследованием, без корреляции —
+     * человек явно просит разобраться. Fingerprint уникален по eventId ({@link Fingerprint#forManual}),
+     * поэтому авто-события к ручному инциденту тоже не привязываются. Lock и проверка дублей не нужны:
+     * eventId — свежий серверный UUID, ключ ни с кем не совпадает.
+     */
+    public IngestResult openManualIncident(IncidentEvent rawEvent) {
+        IncidentEvent event = sanitizer.sanitizeManual(rawEvent);
+        return openNewIncident(event, Fingerprint.forManual(event), clock.instant());
+    }
+
     /** Коррелированное событие: без нового расследования, чтобы шторм ошибок не превратился в шторм вызовов LLM. */
     private IngestResult attachToIncident(OpenIncident incident, IncidentEvent event, Instant now) {
         Severity severity = max(incident.severity(), event.severity());

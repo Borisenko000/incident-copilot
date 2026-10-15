@@ -2,10 +2,7 @@ package dev.polina.copilot.adapter.in.rest;
 
 import dev.polina.copilot.application.IngestResult;
 import dev.polina.copilot.domain.IncidentEvent;
-import dev.polina.copilot.domain.InvestigationStatus;
 import jakarta.validation.Valid;
-import java.net.URI;
-import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,7 +22,7 @@ class EventController {
     }
 
     @PostMapping("/events")
-    ResponseEntity<EventAcceptedResponse> accept(@Valid @RequestBody EventRequest request) {
+    ResponseEntity<IngestAcceptedResponse> accept(@Valid @RequestBody EventRequest request) {
         IncidentEvent event = request.toDomain();
         IngestResult result;
         try {
@@ -33,13 +30,6 @@ class EventController {
         } catch (DuplicateKeyException race) {
             result = ingestion.ingest(event);
         }
-        return ResponseEntity.accepted()
-                .location(URI.create("/api/v1/incidents/" + result.incidentId()))
-                .body(new EventAcceptedResponse(result.incidentId(), result.eventId(),
-                        result.investigationStatus(), result.deduplicated()));
-    }
-
-    record EventAcceptedResponse(UUID incidentId, String eventId, InvestigationStatus investigationStatus,
-                                 boolean deduplicated) {
+        return IngestAcceptedResponse.accepted(result);
     }
 }

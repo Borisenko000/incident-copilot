@@ -51,6 +51,18 @@ class FingerprintTest {
     }
 
     @Test
+    @DisplayName("fingerprint ручного ввода уникален по eventId и не совпадает с обычным")
+    void manualFingerprintIsUniquePerEvent() {
+        IncidentEvent first = event().eventId("manual-1").build();
+        IncidentEvent second = event().eventId("manual-2").build();
+
+        assertThat(Fingerprint.forManual(first)).isNotEqualTo(Fingerprint.of(first));
+        assertThat(Fingerprint.forManual(first)).isNotEqualTo(Fingerprint.forManual(second));
+        assertThat(Fingerprint.forManual(first)).isEqualTo(Fingerprint.forManual(first));
+        assertThat(Fingerprint.forManual(first).value()).matches("[0-9a-f]{64}");
+    }
+
+    @Test
     @DisplayName("значение — SHA-256 в hex (64 символа)")
     void valueIsSha256Hex() {
         assertThat(Fingerprint.of(event().build()).value()).matches("[0-9a-f]{64}");
