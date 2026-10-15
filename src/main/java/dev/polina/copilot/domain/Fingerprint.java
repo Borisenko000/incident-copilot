@@ -26,6 +26,14 @@ public record Fingerprint(String value) {
         return new Fingerprint(sha256Hex(key));
     }
 
+    /**
+     * Ручной ввод в корреляции не участвует ни в одну сторону: ключ уникален по eventId,
+     * поэтому ни ручной ввод не прилипнет к авто-инциденту, ни авто-событие — к ручному.
+     */
+    public static Fingerprint forManual(IncidentEvent event) {
+        return new Fingerprint(sha256Hex("manual|" + event.eventId()));
+    }
+
     private static String normalize(String part) {
         if (part == null || part.isBlank()) {
             return MISSING;

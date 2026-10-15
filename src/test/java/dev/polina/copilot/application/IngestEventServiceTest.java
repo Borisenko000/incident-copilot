@@ -177,6 +177,79 @@ class IngestEventServiceTest {
         assertThat(repository.events.getFirst().event().summary()).isEqualTo("login failed: password=***");
     }
 
+    // ---------- ручной ввод (фаза 2b) ----------
+
+    @Test
+    @DisplayName("ручной ввод → инцидент OPEN + событие + расследование QUEUED v1 + задание READY")
+    void manualIncidentCreatesFullSet() {
+        IncidentEvent manual = event().source("MANUAL").eventId("manual-1").build();
+
+        IngestResult result = service.openManualIncident(manual);
+
+        assertThat(result.deduplicated()).isFalse();
+        assertThat(result.investigationStatus()).isEqualTo(InvestigationStatus.QUEUED);
+        assertThat(repository.incidents.get(result.incidentId()).status()).isEqualTo(IncidentStatus.OPEN);
+        assertThat(repository.events).singleElement()
+                .satisfies(e -> assertThat(e.event().source()).isEqualTo("MANUAL"));
+        assertThat(repository.investigations).singleElement()
+                .satisfies(i -> assertThat(i.version()).isEqualTo(1));
+        assertThat(repository.workItems).singleElement()
+                .satisfies(w -> assertThat(w.dedupeKey()).isEqualTo("investigate:" + repository.investigations.getFirst().id()));
+    }
+
+    @Test
+    @DisplayName("ручной ввод не коррелирует: открытый инцидент с тем же fingerprint не трогается")
+    void manualIncidentIgnoresOpenIncidentWithSameFingerprint() {
+        IngestResult auto = service.ingest(event().eventId("evt-1").build());
+        clock.advance(Duration.ofMinutes(5));
+
+        IngestResult manual = service.openManualIncident(event().source("MANUAL").eventId("manual-1").build());
+
+        assertThat(manual.incidentId()).isNotEqualTo(auto.incidentId());
+        assertThat(repository.incidents.get(auto.incidentId()).updatedAt()).isEqualTo(START);
+        assertThat(repository.events).filteredOn(e -> e.incidentId().equals(auto.incidentId())).hasSize(1);
+        assertThat(repository.investigations).hasSize(2);
+        assertThat(repository.workItems).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("изоляция в обе стороны: авто-событие после ручного ввода идёт в авто-инцидент, а не в ручной")
+    void autoEventDoesNotJoinManualIncident() {
+        IngestResult auto = service.ingest(event().eventId("evt-1").build());
+        clock.advance(Duration.ofMinutes(1));
+        IngestResult manual = service.openManualIncident(event().source("MANUAL").eventId("manual-1").build());
+        clock.advance(Duration.ofMinutes(1));
+
+        IngestResult next = service.ingest(event().eventId("evt-2").build());
+
+        assertThat(next.incidentId()).isEqualTo(auto.incidentId()).isNotEqualTo(manual.incidentId());
+    }
+
+    @Test
+    @DisplayName("если открыт только ручной инцидент, авто-событие создаёт свой инцидент")
+    void autoEventCreatesOwnIncidentWhenOnlyManualIsOpen() {
+        IngestResult manual = service.openManualIncident(event().source("MANUAL").eventId("manual-1").build());
+
+        IngestResult auto = service.ingest(event().eventId("evt-1").build());
+
+        assertThat(auto.incidentId()).isNotEqualTo(manual.incidentId());
+    }
+
+    @Test
+    @DisplayName("ручной ввод маскируется до сохранения — включая type, service и environment, которые вводит человек")
+    void manualIncidentIsSanitized() {
+        service.openManualIncident(event().source("MANUAL").summary("db password=hunter2")
+                .type("token=abc123").service("svc secret=xyz").environment("pwd: qwerty").build());
+
+        IncidentEvent stored = repository.events.getFirst().event();
+        assertThat(stored.summary()).isEqualTo("db password=***");
+        assertThat(stored.type()).isEqualTo("token=***");
+        assertThat(stored.service()).isEqualTo("svc secret=***");
+        assertThat(stored.environment()).isEqualTo("pwd: ***");
+        assertThat(repository.incidents.values()).singleElement()
+                .satisfies(i -> assertThat(i.category()).isEqualTo("token=***"));
+    }
+
     @Test
     @DisplayName("блокировка по fingerprint берётся до любых чтений")
     void locksFingerprintBeforeReadingState() {

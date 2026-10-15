@@ -184,6 +184,21 @@ class EventSanitizerTest {
     }
 
     @Test
+    @DisplayName("sanitizeManual маскирует и type/service/environment; обычный sanitize их не трогает")
+    void sanitizeManualMasksHumanTypedIdentifiers() {
+        IncidentEvent event = event().type("token=abc").service("svc password=x").environment("staging").build();
+
+        IncidentEvent manual = sanitizer.sanitizeManual(event);
+        IncidentEvent auto = sanitizer.sanitize(event);
+
+        assertThat(manual.type()).isEqualTo("token=***");
+        assertThat(manual.service()).isEqualTo("svc password=***");
+        assertThat(manual.environment()).isEqualTo("staging");
+        assertThat(auto.type()).isEqualTo("token=abc");
+        assertThat(auto.service()).isEqualTo("svc password=x");
+    }
+
+    @Test
     @DisplayName("событие без error и словарей обрабатывается без ошибок")
     void handlesMissingOptionalParts() {
         IncidentEvent event = event().summary(null).error(null).attributes(null).build();
