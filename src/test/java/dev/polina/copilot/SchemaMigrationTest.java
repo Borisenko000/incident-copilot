@@ -8,8 +8,6 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -17,10 +15,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.transaction.annotation.Transactional;
 
 /** Проверяет, что миграция V1 создала схему БД с нужными ограничениями. */
-@SpringBootTest
-@Import(TestcontainersConfiguration.class)
 @Transactional // каждый тест откатывается — тесты не мешают друг другу
-class SchemaMigrationTest {
+class SchemaMigrationTest extends AbstractIntegrationTest {
 
     @Autowired
     JdbcClient jdbc;

@@ -8,12 +8,14 @@
 - [x] Flyway-миграции: схемы `ops` и `knowledge`, 7 таблиц
 - [x] `/actuator/health` отвечает `UP`
 
-## Фаза 2 — ingestion
-- [ ] `POST /api/v1/events`: event + incident + investigation(`QUEUED`) + work_item в одной транзакции → `202`
-- [ ] Повтор `(source, eventId)` возвращает тот же `incidentId` и не создаёт дубликатов
-- [ ] `POST /api/v1/incidents` (ручной ввод) и `GET /api/v1/incidents/{id}`
-- [ ] Секреты маскируются до сохранения
-- [ ] Из ревью фазы 1: `updated_at` инцидента обновляется явно при каждом новом событии (тест корреляции); убрать `allowEmptyShould` из `ArchitectureTest`; общий базовый класс интеграционных тестов (один контейнер на прогон)
+## Фаза 2a — ingestion
+- [x] `POST /api/v1/events`: event + incident + investigation(`QUEUED`) + work_item в одной транзакции → `202`; секреты маскируются до сохранения
+- [x] Повтор `(source, eventId)` возвращает тот же `incidentId` и не создаёт дубликатов; корреляция по `fingerprint` + окну
+- [x] `GET /api/v1/incidents/{id}`
+- [x] Из ревью фазы 1: `updated_at` инцидента обновляется явно при каждом новом событии (тест корреляции); убрать `allowEmptyShould` из `ArchitectureTest`; общий базовый класс интеграционных тестов (один контейнер на прогон)
+
+## Фаза 2b — manual
+- [ ] `POST /api/v1/incidents` (ручной ввод): тот же use case приёма, `eventId` генерирует сервер, метрики не выдумываются
 
 ## Фаза 3 — queue
 - [ ] Worker забирает задания через `FOR UPDATE SKIP LOCKED` + lease

@@ -18,9 +18,5 @@ class ArchitectureTest {
                     "org.springframework..",    // Spring, в том числе Spring AI (org.springframework.ai..)
                     "java.sql..", "javax.sql..", // JDBC
                     "chat.giga..")               // GigaChat SDK
-            .because("domain и application — чистая Java; техника живёт в адаптерах (README §14)")
-            // TODO(фаза 2): убрать, когда появятся пакеты domain/application. Пока они пусты,
-            // без этого ArchUnit считает «правило ни к чему не применилось» ошибкой;
-            // но если оставить навсегда, опечатка в имени пакета молча отключит проверку.
-            .allowEmptyShould(true);
+            .because("domain и application — чистая Java; техника живёт в адаптерах (README §14)");
 }
