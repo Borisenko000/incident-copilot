@@ -15,3 +15,10 @@ management:
   endpoint:
     health:
       show-components: always
+
+copilot:
+  ingestion:
+    # Событие с тем же fingerprint привязывается к OPEN-инциденту, если тот был активен в этом окне
+    correlation-window: PT30M
+    # Лимит тела любого запроса (NFR-04); больше → 413
+    max-payload-size: 16KB
